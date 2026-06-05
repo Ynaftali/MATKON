@@ -1,0 +1,6 @@
+CREATE TABLE users (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text, full_name text, avatar_url text, country text, city text, bio text, created_at timestamptz DEFAULT now());
+CREATE TABLE recipes (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid REFERENCES users(id), title text, description text, category text, country_origin text, image_url text, prep_time int, cook_time int, servings int, is_public boolean DEFAULT true, created_at timestamptz DEFAULT now());
+CREATE TABLE ingredients (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), recipe_id uuid REFERENCES recipes(id), name_he text, name_local text, quantity text, unit text, local_substitute text, where_to_buy text);
+CREATE TABLE steps (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), recipe_id uuid REFERENCES recipes(id), step_number int, description text, duration_seconds int);
+CREATE TABLE communities (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), country_code text, country_name text, member_count int DEFAULT 0, created_at timestamptz DEFAULT now());
+CREATE TABLE likes (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), recipe_id uuid REFERENCES recipes(id), user_id uuid REFERENCES users(id), created_at timestamptz DEFAULT now());
