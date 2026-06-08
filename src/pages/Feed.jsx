@@ -90,7 +90,7 @@ export default function Feed() {
     <div className="feed-page page-with-nav">
       <div className="feed-head">
         <div className="feed-title">
-          <span className="feed-logo">🍳 Israel<span>Kitchen</span></span>
+          <span className="feed-logo">🍳 mat<span>kon</span></span>
         </div>
         <div className="search-bar">
           <IconSearch size={18} />

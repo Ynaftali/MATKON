@@ -5,7 +5,7 @@ export default function Splash() {
   return (
     <div className="splash">
       <div style={{ marginBottom: 32 }}>
-        <div className="splash-logo">🍳 Israel<span>Kitchen</span></div>
+        <div className="splash-logo">🍳 mat<span>kon</span></div>
         <p className="splash-tagline">ישראלים מבשלים בכל העולם</p>
       </div>
 
