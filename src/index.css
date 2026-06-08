@@ -1,7 +1,7 @@
 :root {
-  --bg:          #080d1c;
-  --bg-card:     #0d1526;
-  --bg-elevated: #111d35;
+  --bg:          #102947;
+  --bg-card:     #163354;
+  --bg-elevated: #1a3d63;
   --bg-mid:      #1e3a6e;
   --blue:        #3d6fa8;
   --blue-light:  #a8c8f0;
@@ -93,7 +93,7 @@ p  { line-height: 1.6; }
 .topbar {
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 16px; position: sticky; top: 0; z-index: 20;
-  background: rgba(8,13,28,.92); backdrop-filter: blur(12px);
+  background: rgba(16,41,71,.92); backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
 }
 .topbar-title { font-size: 1rem; font-weight: 700; flex: 1; text-align: center; }
