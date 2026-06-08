@@ -33,7 +33,7 @@ export default function MatkonLogo({ size = 1, animate = true, className = '' })
       </svg>
 
       {/* MATKON text with O slot */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0, direction: 'ltr' }}>
         <span style={{
           fontFamily: "'Heebo', sans-serif",
           fontSize: fontSize,
