@@ -1,4 +1,5 @@
-const FOODS = ['🍳', '🥘', '🍕', '🫓', '🍲', '🥗', '🫕', '🥙']
+// Only round foods seen from above (top-down view)
+const FOODS = ['🍳', '🍕', '🥘', '🍲', '🫕', '🥗', '🧆', '🫔']
 
 // Pick once per session load — never changes until refresh
 const SESSION_FOOD = FOODS[Math.floor(Math.random() * FOODS.length)]
@@ -12,7 +13,7 @@ export default function MatkonLogo({ size = 1, className = '' }) {
       style={{ display: 'inline-flex', alignItems: 'center', direction: 'ltr' }}
     >
       <span style={{
-        fontFamily: "'Nunito', 'Heebo', sans-serif",
+        fontFamily: "'Assistant', 'Heebo', sans-serif",
         fontSize: fontSize,
         fontWeight: 900,
         color: 'white',
@@ -34,7 +35,7 @@ export default function MatkonLogo({ size = 1, className = '' }) {
       </span>
 
       <span style={{
-        fontFamily: "'Nunito', 'Heebo', sans-serif",
+        fontFamily: "'Assistant', 'Heebo', sans-serif",
         fontSize: fontSize,
         fontWeight: 900,
         color: 'white',
