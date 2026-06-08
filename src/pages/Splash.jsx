@@ -4,7 +4,7 @@ export default function Splash() {
   return (
     <div className="splash">
       <div style={{ marginBottom: 32, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <img src="/logofullbackground.png" alt="matkon" style={{ width: '100%', maxWidth: 380, borderRadius: 12 }} />
+        <img src="/logofullNObackground.png" alt="matkon" style={{ width: '100%', maxWidth: 380 }} />
         <p className="splash-tagline" style={{ marginTop: 16 }}>ישראלים מבשלים בכל העולם</p>
       </div>
 
