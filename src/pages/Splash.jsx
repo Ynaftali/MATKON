@@ -1,12 +1,10 @@
 import { useNavigate } from 'react-router-dom'
-import MatkonLogo from '../components/MatkonLogo'
-
 export default function Splash() {
   const navigate = useNavigate()
   return (
     <div className="splash">
       <div style={{ marginBottom: 32, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <MatkonLogo size={1} />
+        <img src="/matkon-logo.png" alt="matkon" style={{ width: '100%', maxWidth: 360, borderRadius: 12 }} />
         <p className="splash-tagline" style={{ marginTop: 16 }}>ישראלים מבשלים בכל העולם</p>
       </div>
 
