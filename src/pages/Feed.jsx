@@ -4,6 +4,7 @@ import { IconSearch, IconPlus, IconHeart, IconMessageCircle } from '@tabler/icon
 import { supabase } from '../lib/supabase'
 import { mockRecipes, CATEGORY_GRADIENTS } from '../lib/mock'
 import BottomNav from '../components/BottomNav'
+import MatkonLogo from '../components/MatkonLogo'
 
 const FILTERS = ['הכל', 'בשרי', 'טבעוני', 'ארוחת בוקר', 'קינוחים', '🇩🇪', '🇺🇸', '🇫🇷', '🇳🇿']
 
@@ -90,7 +91,7 @@ export default function Feed() {
     <div className="feed-page page-with-nav">
       <div className="feed-head">
         <div className="feed-title">
-          <span className="feed-logo">🍳 mat<span>kon</span></span>
+          <MatkonLogo size={0.38} animate={true} />
         </div>
         <div className="search-bar">
           <IconSearch size={18} />
