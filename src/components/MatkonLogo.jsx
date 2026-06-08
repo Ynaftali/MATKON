@@ -6,7 +6,7 @@ export default function MatkonLogo({ size = 1, className = '' }) {
   const emojiSize = capHeight / 0.55
 
   const textStyle = {
-    fontFamily: "'Assistant', 'Heebo', sans-serif",
+    fontFamily: "'Assistant', 'Assistant', sans-serif",
     fontSize: fontSize,
     fontWeight: 700,
     color: 'white',

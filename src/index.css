@@ -21,7 +21,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html {
-  font-family: 'Heebo', system-ui, sans-serif;
+  font-family: 'Assistant', system-ui, sans-serif;
   background: var(--bg);
   color: var(--text);
   direction: rtl;
@@ -53,7 +53,7 @@ p  { line-height: 1.6; }
 .btn {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   border: none; border-radius: var(--radius);
-  font-family: 'Heebo', sans-serif; font-size: 1rem; font-weight: 700;
+  font-family: 'Assistant', sans-serif; font-size: 1rem; font-weight: 700;
   cursor: pointer; padding: 14px 24px; width: 100%;
   transition: opacity .15s, transform .1s;
 }
@@ -76,7 +76,7 @@ p  { line-height: 1.6; }
 .input {
   width: 100%; background: var(--bg-elevated); color: var(--text);
   border: 1.5px solid var(--border-mid); border-radius: var(--radius);
-  padding: 13px 16px; font-family: 'Heebo', sans-serif; font-size: 1rem;
+  padding: 13px 16px; font-family: 'Assistant', sans-serif; font-size: 1rem;
   outline: none; transition: border-color .2s;
   direction: rtl;
 }
@@ -217,7 +217,7 @@ p  { line-height: 1.6; }
 .auth-sso-btn {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px;
   background: var(--bg-elevated); border: 1.5px solid var(--border-mid); border-radius: var(--radius);
-  color: var(--text); font-family: 'Heebo', sans-serif; font-size: .9rem; font-weight: 600;
+  color: var(--text); font-family: 'Assistant', sans-serif; font-size: .9rem; font-weight: 600;
   padding: 13px 16px; cursor: pointer;
   transition: background .18s, border-color .18s, box-shadow .18s, transform .12s;
   box-shadow: 0 1px 4px rgba(0,0,0,.08);
@@ -264,7 +264,7 @@ p  { line-height: 1.6; }
 }
 .search-bar input {
   flex: 1; background: none; border: none; outline: none;
-  color: var(--text); font-family: 'Heebo', sans-serif; font-size: .95rem; direction: rtl;
+  color: var(--text); font-family: 'Assistant', sans-serif; font-size: .95rem; direction: rtl;
 }
 .search-bar input::placeholder { color: var(--text-muted); }
 .search-bar svg { color: var(--text-muted); flex-shrink: 0; }
@@ -514,7 +514,7 @@ p  { line-height: 1.6; }
 .input-tab {
   flex: 1; padding: 8px; border-radius: 6px; text-align: center; font-size: .82rem; font-weight: 600;
   color: var(--text-muted); cursor: pointer; transition: all .15s; border: none; background: none;
-  font-family: 'Heebo', sans-serif;
+  font-family: 'Assistant', sans-serif;
 }
 .input-tab.active { background: var(--bg-mid); color: var(--text); }
 
@@ -565,7 +565,7 @@ p  { line-height: 1.6; }
   display: flex; align-items: center; gap: 10px; padding: 14px;
   background: var(--bg-elevated); border-radius: var(--radius);
   border: 1px solid var(--border-mid); cursor: pointer; font-size: .9rem; font-weight: 600;
-  color: var(--text); font-family: 'Heebo', sans-serif;
+  color: var(--text); font-family: 'Assistant', sans-serif;
 }
 
 /* ── ════════════════════════════════════════════════ */
