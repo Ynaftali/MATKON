@@ -6,7 +6,7 @@ export default function Splash() {
   return (
     <div className="splash">
       <div style={{ marginBottom: 32, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <MatkonLogo size={0.7} animate={true} />
+        <MatkonLogo size={1} />
         <p className="splash-tagline" style={{ marginTop: 16 }}>ישראלים מבשלים בכל העולם</p>
       </div>
 

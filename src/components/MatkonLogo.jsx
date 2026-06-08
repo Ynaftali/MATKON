@@ -1,11 +1,8 @@
-// Only round foods seen from above (top-down view)
-const FOODS = ['🍳', '🍕', '🥘', '🍲', '🫕', '🥗', '🧆', '🫔']
-
-// Pick once per session load — never changes until refresh
-const SESSION_FOOD = FOODS[Math.floor(Math.random() * FOODS.length)]
+// 🍳 Always top-down round view
+const SESSION_FOOD = '🍳'
 
 export default function MatkonLogo({ size = 1, className = '' }) {
-  const fontSize = 52 * size
+  const fontSize = 72 * size
 
   return (
     <div
@@ -15,21 +12,20 @@ export default function MatkonLogo({ size = 1, className = '' }) {
       <span style={{
         fontFamily: "'Assistant', 'Heebo', sans-serif",
         fontSize: fontSize,
-        fontWeight: 900,
+        fontWeight: 700,
         color: 'white',
-        letterSpacing: 3 * size,
+        letterSpacing: 2 * size,
         lineHeight: 1,
       }}>
         MATK
       </span>
 
-      {/* Food emoji replaces the O */}
+      {/* 🍳 replaces the O — top-down round view */}
       <span style={{
-        fontSize: fontSize * 0.88,
+        fontSize: fontSize * 0.9,
         lineHeight: 1,
         display: 'inline-flex',
         alignItems: 'center',
-        marginBottom: 1 * size,
       }}>
         {SESSION_FOOD}
       </span>
@@ -37,9 +33,9 @@ export default function MatkonLogo({ size = 1, className = '' }) {
       <span style={{
         fontFamily: "'Assistant', 'Heebo', sans-serif",
         fontSize: fontSize,
-        fontWeight: 900,
+        fontWeight: 700,
         color: 'white',
-        letterSpacing: 3 * size,
+        letterSpacing: 2 * size,
         lineHeight: 1,
       }}>
         N
