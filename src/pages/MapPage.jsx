@@ -14,7 +14,7 @@ export default function MapPage() {
     <div className="map-page">
       <div className="topbar">
         <div className="topbar-side" />
-        <span className="topbar-title">IsraelKitchen</span>
+        <span className="topbar-title">matkon</span>
         <div className="topbar-side" />
       </div>
 

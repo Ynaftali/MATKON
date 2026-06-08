@@ -59,7 +59,7 @@ export default function AddRecipe() {
   }
 
   function copyLink() {
-    navigator.clipboard.writeText('https://israelkitchen.app/recipe/demo')
+    navigator.clipboard.writeText('https://matkon.co/recipe/demo')
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
