@@ -99,8 +99,9 @@ export default function AddRecipe() {
       return
     }
 
-    // Auto-assign a food image based on category
-    const CATEGORY_IMAGES = {
+    // Auto-fetch image from TheMealDB by recipe title (free, no auth)
+    // Falls back to Pexels static images by category
+    const FALLBACK_IMAGES = {
       'בשרי':        'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&q=80',
       'חלבי':        'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80',
       'טבעוני':      'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&q=80',
@@ -109,7 +110,18 @@ export default function AddRecipe() {
       'שתייה':       'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=800&q=80',
       'אחר':         'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80',
     }
-    const image_url = CATEGORY_IMAGES[recipe.category] || CATEGORY_IMAGES['אחר']
+    let image_url = FALLBACK_IMAGES[recipe.category] || FALLBACK_IMAGES['אחר']
+    try {
+      // TheMealDB: search using English term returned by AI
+      const searchTerm = recipe.image_search || ''
+      if (searchTerm) {
+        const res = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(searchTerm)}`)
+        const json = await res.json()
+        if (json.meals?.[0]?.strMealThumb) {
+          image_url = json.meals[0].strMealThumb
+        }
+      }
+    } catch { /* keep fallback */ }
 
     const { data, error } = await supabase.from('recipes').insert({
       user_id:      user.id,

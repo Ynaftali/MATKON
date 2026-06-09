@@ -72,14 +72,16 @@ export default async function handler(req, res) {
   "cook_time": 20,
   "servings": 4,
   "category": "אחת מ: ארוחת בוקר / בשרי / חלבי / טבעוני / קינוחים / שתייה / אחר",
-  "tags": ["ישראלי", "ביתי"]
+  "tags": ["ישראלי", "ביתי"],
+  "image_search": "hummus chickpeas"
 }
 
 כללים:
 - החזר JSON בלבד, ללא טקסט נוסף
 - תרגם לעברית אם הטקסט באנגלית
 - אם חסר מידע, השתמש בערכי ברירת מחדל הגיוניים
-- tags: בחר 2-4 תגיות רלוונטיות`
+- tags: בחר 2-4 תגיות רלוונטיות
+- image_search: 2-3 מילים באנגלית שמתארות את המנה לחיפוש תמונה (לדוגמה: "grilled chicken", "chocolate cake")`
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
