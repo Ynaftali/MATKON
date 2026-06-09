@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 import { IconChevronRight, IconFlame, IconPencil, IconLink, IconCamera, IconPlus, IconX, IconLock, IconWorld, IconBrandWhatsapp, IconBrandInstagram, IconBrandFacebook, IconCopy } from '@tabler/icons-react'
 
 const AI_STEPS = [
@@ -39,6 +40,9 @@ export default function AddRecipe() {
   const [newTag, setNewTag]       = useState('')
   const [isPublic, setIsPublic]   = useState(true)
   const [copied, setCopied]       = useState(false)
+  const [saving, setSaving]       = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [savedId, setSavedId]     = useState(null)
   const fileRef = useRef()
 
   async function runAI() {
@@ -84,6 +88,41 @@ export default function AddRecipe() {
     }
   }
 
+  async function saveRecipe() {
+    setSaving(true)
+    setSaveError('')
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      navigate('/login')
+      return
+    }
+
+    const { data, error } = await supabase.from('recipes').insert({
+      user_id:      user.id,
+      title:        recipe.title,
+      description:  recipe.description || '',
+      ingredients:  recipe.ingredients || [],
+      steps:        recipe.steps       || [],
+      prep_time:    recipe.prep_time   || 0,
+      cook_time:    recipe.cook_time   || 0,
+      servings:     recipe.servings    || 2,
+      category:     recipe.category    || 'אחר',
+      tags:         tags,
+      is_public:    isPublic,
+    }).select('id').single()
+
+    setSaving(false)
+
+    if (error) {
+      setSaveError('שגיאה בשמירה: ' + error.message)
+      return
+    }
+
+    setSavedId(data.id)
+    setStep(4)
+  }
+
   function handleImageUpload(e) {
     const file = e.target.files[0]
     if (!file) return
@@ -103,7 +142,8 @@ export default function AddRecipe() {
   }
 
   function copyLink() {
-    navigator.clipboard.writeText('https://matkon.co/recipe/demo')
+    const link = savedId ? `https://matkon.co/recipe/${savedId}` : 'https://matkon.co'
+    navigator.clipboard.writeText(link)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -271,8 +311,10 @@ export default function AddRecipe() {
             </div>
           </div>
 
-          <button className="btn btn-green" onClick={() => setStep(4)}>
-            שמרו את המתכון
+          {saveError && <p style={{ color:'var(--red)', fontSize:'.9rem', textAlign:'center' }}>{saveError}</p>}
+
+          <button className="btn btn-green" onClick={saveRecipe} disabled={saving}>
+            {saving ? 'שומר...' : 'שמרו את המתכון'}
           </button>
         </div>
       )}
