@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IconChevronRight } from '@tabler/icons-react'
 import { COUNTRIES } from '../lib/mock'
+import { supabase } from '../lib/supabase'
 
 function getStrength(pw) {
   if (!pw) return 0
@@ -16,15 +17,45 @@ const strengthClass = ['', 'weak', 'medium', 'strong']
 
 export default function Register() {
   const navigate = useNavigate()
-  const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '', confirm: '', country: '' })
+  const [form, setForm]   = useState({ firstName: '', lastName: '', email: '', password: '', confirm: '', country: '' })
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
-  const strength    = getStrength(form.password)
+  const strength       = getStrength(form.password)
   const passwordsMatch = form.confirm ? form.password === form.confirm : null
 
-  const submit = e => {
+  const submit = async e => {
     e.preventDefault()
-    navigate('/complete-profile')
+    if (!passwordsMatch) return
+    setError('')
+    setLoading(true)
+
+    const { data, error } = await supabase.auth.signUp({
+      email:    form.email,
+      password: form.password,
+      options: {
+        data: {
+          full_name: `${form.firstName} ${form.lastName}`,
+          country:   form.country,
+        }
+      }
+    })
+
+    if (error) { setError(error.message); setLoading(false); return }
+
+    // Also insert into users table
+    if (data.user) {
+      await supabase.from('users').upsert({
+        id:        data.user.id,
+        full_name: `${form.firstName} ${form.lastName}`,
+        country:   form.country,
+        email:     form.email,
+      })
+    }
+
+    setLoading(false)
+    navigate('/feed')
   }
 
   return (
@@ -88,8 +119,9 @@ export default function Register() {
           </select>
         </div>
 
-        <button className="btn btn-green" type="submit" style={{ backgroundColor: '#3d6fa8', borderColor: '#3d6fa8' }}>
-          מוכנים להיכנס למטבח
+        {error && <p style={{ color:'var(--red)', fontSize:'.9rem', textAlign:'center' }}>{error}</p>}
+        <button className="btn btn-green" type="submit" disabled={loading || !passwordsMatch} style={{ backgroundColor: '#3d6fa8', borderColor: '#3d6fa8' }}>
+          {loading ? 'יוצר חשבון...' : 'מוכנים להיכנס למטבח'}
         </button>
 
         <div className="auth-divider">או הירשמו עם</div>

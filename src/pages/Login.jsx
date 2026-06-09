@@ -1,14 +1,25 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IconChevronRight } from '@tabler/icons-react'
+import { supabase } from '../lib/supabase'
 
 export default function Login() {
   const navigate = useNavigate()
-  const [form, setForm] = useState({ email: '', password: '' })
+  const [form, setForm]   = useState({ email: '', password: '' })
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
-  const submit = e => {
+  const submit = async e => {
     e.preventDefault()
+    setError('')
+    setLoading(true)
+    const { error } = await supabase.auth.signInWithPassword({
+      email:    form.email,
+      password: form.password,
+    })
+    setLoading(false)
+    if (error) { setError('אימייל או סיסמה שגויים'); return }
     navigate('/feed')
   }
 
@@ -37,7 +48,10 @@ export default function Login() {
           <div className="auth-forgot"><a onClick={() => {}}>שכחתם סיסמה?</a></div>
         </div>
 
-        <button className="btn btn-primary" type="submit">כניסה לחשבון</button>
+        {error && <p style={{ color:'var(--red)', fontSize:'.9rem', textAlign:'center' }}>{error}</p>}
+        <button className="btn btn-primary" type="submit" disabled={loading}>
+          {loading ? 'מתחבר...' : 'כניסה לחשבון'}
+        </button>
 
         <div className="auth-divider">או</div>
 

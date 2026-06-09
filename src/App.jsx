@@ -12,6 +12,7 @@ import AddRecipe       from './pages/AddRecipe'
 import Profile         from './pages/Profile'
 import MapPage         from './pages/MapPage'
 import Community       from './pages/Community'
+import Recipes         from './pages/Recipes'
 
 export default function App() {
   return (
@@ -30,6 +31,7 @@ export default function App() {
         <Route path="/profile"          element={<Profile />}         />
         <Route path="/map"              element={<MapPage />}         />
         <Route path="/community/:country" element={<Community />}    />
+        <Route path="/recipes"            element={<Recipes />}       />
         <Route path="*"                 element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>
