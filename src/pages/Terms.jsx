@@ -1,11 +1,50 @@
 import { useNavigate } from 'react-router-dom'
 import { IconChevronRight } from '@tabler/icons-react'
 
+const SECTIONS = [
+  {
+    title: 'קבלת התנאים',
+    body: 'בהרשמה לפלטפורמה אתם מאשרים שקראתם, הבנתם, ומסכימים לכל התנאים המפורטים להלן. אם אינכם מסכימים, אין להשתמש בפלטפורמה.',
+  },
+  {
+    title: 'זכויות יוצרים ותוכן',
+    body: 'כל תוכן שתעלו לפלטפורמה (מתכונים, תמונות, תגובות) חייב להיות בבעלותכם או שיש לכם רישיון מפורש להשתמש בו. Matkon לא תישא באחריות לתוכן שמפר זכויות יוצרים של צד שלישי, והאחריות המלאה חלה על המשתמש שהעלה את התוכן.',
+  },
+  {
+    title: 'רישיון שימוש בתוכן',
+    body: 'בהעלאת תוכן כלשהו לפלטפורמה, אתם מעניקים ל-Matkon רישיון עולמי, לא-בלעדי, בלתי-חוזר, ללא תמלוגים, עם זכות להעניק רישיון משנה, לשימוש בתוכן לכל מטרה הקשורה לפעילות Matkon — לרבות הצגה באתר ובאפליקציה, שיווק, פרסום, יחסי ציבור, כתבות תקשורת, רשתות חברתיות, מצגות, ומהדורות עתידיות של המוצר — בכל מדיה קיימת ועתידית, ללא הגבלת זמן.',
+  },
+  {
+    title: 'תוכן אסור',
+    body: 'המשתמש מתחייב שלא להעלות תוכן שהוא אנטישמי, גזעני, מפלה, פוגעני, מיני, אלים, מאיים, או כל תוכן שעלול לפגוע בכבוד האדם. Matkon תסיר תוכן כאמור ללא הודעה מוקדמת.',
+  },
+  {
+    title: 'פרטיות ואבטחה',
+    body: 'המשתמש מתחייב שלא לפרסם מידע מזהה של אנשים אחרים ללא הסכמתם המפורשת. אין לפרסם כתובות בתים, מספרי טלפון, או פרטים מזהים של אנשים פרטיים.',
+  },
+  {
+    title: 'תמונות של ילדים',
+    body: 'המשתמש מתחייב שלא להעלות תמונות הכוללות פנים של ילדים מתחת לגיל 18 ללא הסכמת הורה או אפוטרופוס חתומה.',
+  },
+  {
+    title: 'סמכות ניהול',
+    body: 'Matkon שומרת לעצמה את הזכות הבלעדית, ולפי שיקול דעתה המוחלט, להסיר כל תוכן ולחסום כל משתמש — ללא הודעה מוקדמת, ללא חובת הנמקה, וללא זכות ערעור. הסרת תוכן או חסימת משתמש אינה מקנה כל זכות פיצוי.',
+  },
+  {
+    title: 'זכות למחיקה (GDPR)',
+    body: 'משתמשים זכאים לבקש מחיקת כל נתוניהם האישיים מהמערכת. בקשות יש לשלוח לכתובת privacy@matkon.co ויטופלו תוך 30 יום.',
+  },
+  {
+    title: 'שיפוט',
+    body: 'כל מחלוקת תידון בבתי המשפט בישראל, על פי הדין הישראלי.',
+  },
+]
+
 export default function Terms() {
   const navigate = useNavigate()
 
   return (
-    <div className="auth-page" style={{ paddingBottom: 40 }}>
+    <div className="auth-page" style={{ paddingBottom: 48 }}>
       <div className="topbar" style={{ position: 'static', padding: '0 0 16px' }}>
         <button className="btn-icon" onClick={() => navigate(-1)}>
           <IconChevronRight size={20} />
@@ -14,13 +53,16 @@ export default function Terms() {
 
       <div className="auth-header">
         <h1>תנאי שימוש</h1>
-        <p>עדכון אחרון: יוני 2026</p>
+        <p style={{ color: 'var(--text-muted)', fontSize: '.85rem' }}>עדכון אחרון: יוני 2026</p>
       </div>
 
-      <div style={{ padding: '0 4px', lineHeight: 1.8, color: 'var(--text-2)', fontSize: '.95rem' }}>
-        <p style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0' }}>
-          תוכן תנאי השימוש יעודכן בקרוב.
-        </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24, padding: '8px 4px' }}>
+        {SECTIONS.map(s => (
+          <div key={s.title}>
+            <h3 style={{ color: 'var(--blue-light)', marginBottom: 6, fontSize: '1rem' }}>{s.title}</h3>
+            <p style={{ color: 'var(--text-2)', lineHeight: 1.75, fontSize: '.93rem' }}>{s.body}</p>
+          </div>
+        ))}
       </div>
     </div>
   )
