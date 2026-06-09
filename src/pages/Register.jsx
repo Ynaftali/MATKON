@@ -55,7 +55,8 @@ export default function Register() {
     }
 
     setLoading(false)
-    navigate('/feed')
+    localStorage.setItem('pending_email', form.email)
+    navigate('/verify-email')
   }
 
   return (

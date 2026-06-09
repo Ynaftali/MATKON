@@ -1,4 +1,18 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
+import { supabase } from './lib/supabase'
+
+function AuthCallback() {
+  const navigate = useNavigate()
+  useEffect(() => {
+    supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        navigate('/complete-profile', { replace: true })
+      }
+    })
+  }, [])
+  return null
+}
 import Splash          from './pages/Splash'
 import Peek            from './pages/Peek'
 import Register        from './pages/Register'
@@ -13,6 +27,7 @@ import Profile         from './pages/Profile'
 import MapPage         from './pages/MapPage'
 import Community       from './pages/Community'
 import Recipes         from './pages/Recipes'
+import VerifyEmail     from './pages/VerifyEmail'
 
 export default function App() {
   return (
@@ -31,8 +46,10 @@ export default function App() {
         <Route path="/profile"          element={<Profile />}         />
         <Route path="/map"              element={<MapPage />}         />
         <Route path="/community/:country" element={<Community />}    />
-        <Route path="/recipes"            element={<Recipes />}       />
-        <Route path="*"                 element={<Navigate to="/" />} />
+        <Route path="/recipes"             element={<Recipes />}      />
+        <Route path="/verify-email"        element={<VerifyEmail />}  />
+        <Route path="/auth/callback"       element={<AuthCallback />} />
+        <Route path="*"                    element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>
   )
