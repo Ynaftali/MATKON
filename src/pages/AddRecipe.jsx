@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IconChevronRight, IconFlame, IconPencil, IconLink, IconCamera, IconPlus, IconX, IconLock, IconWorld, IconBrandWhatsapp, IconBrandInstagram, IconBrandFacebook, IconCopy } from '@tabler/icons-react'
 
 const AI_STEPS = [
   { icon: '🥕', label: 'זיהוי מצרכים' },
-  { icon: '🌍', label: 'תרגום מקומי' },
-  { icon: '🔍', label: 'מיפוי מצרכים נדירים' },
+  { icon: '🌍', label: 'תרגום לעברית' },
+  { icon: '🔍', label: 'מיפוי מצרכים' },
   { icon: '📋', label: 'סידור שלבי הכנה' },
   { icon: '🏷️', label: 'תיוג אוטומטי' },
 ]
@@ -30,26 +30,70 @@ export default function AddRecipe() {
   const [step, setStep]           = useState(1)
   const [inputType, setInputType] = useState('text')
   const [text, setText]           = useState('')
+  const [url, setUrl]             = useState('')
+  const [imageBase64, setImageBase64] = useState(null)
   const [aiStep, setAiStep]       = useState(0)
-  const [tags, setTags]           = useState(['ישראלי', 'ביתי', 'מסורתי'])
+  const [aiError, setAiError]     = useState('')
+  const [recipe, setRecipe]       = useState(null)
+  const [tags, setTags]           = useState([])
   const [newTag, setNewTag]       = useState('')
   const [isPublic, setIsPublic]   = useState(true)
   const [copied, setCopied]       = useState(false)
+  const fileRef = useRef()
 
-  useEffect(() => {
-    if (step !== 2) return
+  async function runAI() {
+    setStep(2)
+    setAiStep(0)
+    setAiError('')
+
+    // Animate steps while waiting
+    let i = 0
     const interval = setInterval(() => {
-      setAiStep(s => {
-        if (s >= AI_STEPS.length - 1) {
-          clearInterval(interval)
-          setTimeout(() => setStep(3), 600)
-          return s
-        }
-        return s + 1
+      i++
+      if (i < AI_STEPS.length) setAiStep(i)
+    }, 900)
+
+    try {
+      const body = inputType === 'link'  ? { url } :
+                   inputType === 'photo' ? { imageBase64 } :
+                   { text }
+
+      const res = await fetch('/api/parse-recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
       })
-    }, 700)
-    return () => clearInterval(interval)
-  }, [step])
+      const data = await res.json()
+
+      clearInterval(interval)
+      setAiStep(AI_STEPS.length - 1)
+
+      if (!res.ok) {
+        setAiError(data.message || data.error || 'שגיאה לא ידועה')
+        setStep(1)
+        return
+      }
+
+      setRecipe(data.recipe)
+      setTags(data.recipe.tags || [])
+      setTimeout(() => setStep(3), 600)
+    } catch {
+      clearInterval(interval)
+      setAiError('בעיית תקשורת — נסה שוב')
+      setStep(1)
+    }
+  }
+
+  function handleImageUpload(e) {
+    const file = e.target.files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      // Strip data:image/...;base64, prefix
+      setImageBase64(ev.target.result.split(',')[1])
+    }
+    reader.readAsDataURL(file)
+  }
 
   function addTag() {
     if (newTag.trim() && !tags.includes(newTag.trim())) {
@@ -101,16 +145,32 @@ export default function AddRecipe() {
             />
           )}
           {inputType === 'link' && (
-            <input className="input" placeholder="הדביקו לינק למתכון..." />
+            <input
+              className="input"
+              placeholder="הדביקו לינק למתכון (אתרים, בלוגים...)"
+              value={url}
+              onChange={e => setUrl(e.target.value)}
+            />
           )}
           {inputType === 'photo' && (
-            <div className="photo-upload">
-              <IconCamera size={32} color="var(--text-muted)" />
-              <p>בא לכם להשוויץ במנה שבישלתם?<br/>צלמו ושתפו תמונה של המנה שלכם<br/><span style={{ color:'var(--text-muted)', fontSize:'.78rem' }}>(לא חובה, המערכת יכולה גם לייצר תמונה משלה)</span></p>
+            <div className="photo-upload" onClick={() => fileRef.current.click()} style={{ cursor: 'pointer' }}>
+              <input ref={fileRef} type="file" accept="image/*" style={{ display:'none' }} onChange={handleImageUpload} />
+              <IconCamera size={32} color={imageBase64 ? 'var(--green)' : 'var(--text-muted)'} />
+              <p>{imageBase64 ? '✅ תמונה נטענה — לחצו לשנות' : 'לחצו לבחירת תמונה או צילום מסך של מתכון'}</p>
             </div>
           )}
 
-          <button className="btn btn-primary" onClick={() => setStep(2)} disabled={inputType === 'text' && !text.trim()}>
+          {aiError && <p style={{ color:'var(--red)', fontSize:'.9rem', textAlign:'center' }}>{aiError}</p>}
+
+          <button
+            className="btn btn-primary"
+            onClick={runAI}
+            disabled={
+              (inputType === 'text'  && !text.trim()) ||
+              (inputType === 'link'  && !url.trim())  ||
+              (inputType === 'photo' && !imageBase64)
+            }
+          >
             <IconFlame size={18} /> יאללה, אפשר להתקדם
           </button>
         </div>
@@ -139,6 +199,31 @@ export default function AddRecipe() {
       {/* ── Step 3: Tags + Share ── */}
       {step === 3 && (
         <div className="add-body">
+
+          {/* Recipe preview */}
+          {recipe && (
+            <div style={{ background:'var(--bg-elevated)', borderRadius:16, padding:16 }}>
+              <h2 style={{ marginBottom:6 }}>{recipe.title}</h2>
+              {recipe.description && <p style={{ color:'var(--text-2)', fontSize:'.9rem', marginBottom:12 }}>{recipe.description}</p>}
+              <div style={{ display:'flex', gap:12, fontSize:'.82rem', color:'var(--text-muted)', marginBottom:12 }}>
+                {recipe.prep_time > 0 && <span>⏱ הכנה: {recipe.prep_time} דק׳</span>}
+                {recipe.cook_time > 0 && <span>🔥 בישול: {recipe.cook_time} דק׳</span>}
+                {recipe.servings  > 0 && <span>🍽️ {recipe.servings} מנות</span>}
+              </div>
+              {recipe.ingredients?.length > 0 && (
+                <>
+                  <div className="section-title" style={{ fontSize:'.85rem', marginBottom:8 }}>מצרכים</div>
+                  <ul style={{ paddingRight:16, fontSize:'.88rem', color:'var(--text-2)', lineHeight:1.8 }}>
+                    {recipe.ingredients.map((ing, i) => (
+                      <li key={i}>{ing.amount} {ing.unit} {ing.name}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          )}
+
+          <div className="divider" />
           <div>
             <div className="section-title">תגיות</div>
             <div className="tags-wrap" style={{ marginBottom: 12 }}>
