@@ -1,49 +1,100 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { IconChevronRight, IconPlayerPlay, IconPlayerPause, IconRotate } from '@tabler/icons-react'
+import { supabase } from '../lib/supabase'
 import { mockRecipes } from '../lib/mock'
 
-function fmtTime(s) {
+function fmtCountdown(s) {
   const m = Math.floor(s / 60)
   const sec = s % 60
   return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
 }
 
-export default function CookingMode() {
-  const { id }      = useParams()
-  const navigate    = useNavigate()
-  const recipe      = mockRecipes.find(r => r.id === id) || mockRecipes[0]
-  const steps       = recipe.steps || []
-
-  const [current, setCurrent]   = useState(0)
-  const [done, setDone]         = useState([])
-  const [finished, setFinished] = useState(false)
-
-  const [seconds, setSeconds]   = useState(0)
-  const [running, setRunning]   = useState(false)
-  const intervalRef             = useRef(null)
+function StepTimer({ durationSeconds }) {
+  const [remaining, setRemaining] = useState(durationSeconds)
+  const [running, setRunning]     = useState(false)
+  const [done, setDone]           = useState(false)
+  const intervalRef               = useRef(null)
 
   useEffect(() => {
-    if (running) {
-      intervalRef.current = setInterval(() => setSeconds(s => s + 1), 1000)
+    if (running && remaining > 0) {
+      intervalRef.current = setInterval(() => {
+        setRemaining(r => {
+          if (r <= 1) { clearInterval(intervalRef.current); setRunning(false); setDone(true); return 0 }
+          return r - 1
+        })
+      }, 1000)
     } else {
       clearInterval(intervalRef.current)
     }
     return () => clearInterval(intervalRef.current)
   }, [running])
 
+  function reset() { setRemaining(durationSeconds); setRunning(false); setDone(false) }
+
+  return (
+    <div className={`step-timer ${done ? 'done' : running ? 'running' : ''}`}>
+      <div className="step-timer-display">{done ? '✓ הסתיים' : fmtCountdown(remaining)}</div>
+      <div className="step-timer-controls">
+        <button
+          className="step-timer-btn"
+          onClick={e => { e.stopPropagation(); setRunning(r => !r) }}
+          disabled={done}
+        >
+          {running ? <IconPlayerPause size={14} /> : <IconPlayerPlay size={14} />}
+          {running ? 'עצור' : done ? 'הסתיים' : 'הפעל'}
+        </button>
+        <button className="step-timer-btn step-timer-reset" onClick={e => { e.stopPropagation(); reset() }}>
+          <IconRotate size={14} /> אפס
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export default function CookingMode() {
+  const { id }    = useParams()
+  const navigate  = useNavigate()
+
+  const [recipe, setRecipe]     = useState(null)
+  const [loading, setLoading]   = useState(true)
+  const [current, setCurrent]   = useState(0)
+  const [done, setDone]         = useState([])
+  const [finished, setFinished] = useState(false)
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase.from('recipes').select('*').eq('id', id).single()
+      if (data) { setRecipe(data) }
+      else {
+        const mock = mockRecipes.find(r => r.id === id)
+        setRecipe(mock || null)
+      }
+      setLoading(false)
+    }
+    load()
+  }, [id])
+
+  if (loading) return (
+    <div className="cook-page" style={{ display:'flex', alignItems:'center', justifyContent:'center' }}>
+      <p style={{ color:'var(--text-muted)' }}>טוענים...</p>
+    </div>
+  )
+
+  if (!recipe) return null
+
+  const steps    = recipe.steps || []
   const progress = steps.length ? Math.round((done.length / steps.length) * 100) : 0
+
+  function goToStep(i) {
+    setCurrent(i)
+    setDone(d => d.filter(x => x < i))
+  }
 
   function completeStep() {
     if (current >= steps.length - 1) { setFinished(true); return }
-    setDone(d => [...d, current])
+    setDone(d => [...new Set([...d, current])])
     setCurrent(c => c + 1)
-    setSeconds(0); setRunning(false)
-  }
-
-  function undoStep(i) {
-    setDone(d => d.filter(x => x !== i))
-    setCurrent(i)
   }
 
   if (finished) {
@@ -64,7 +115,6 @@ export default function CookingMode() {
 
   return (
     <div className="cook-page">
-      {/* Top */}
       <div className="topbar">
         <button className="btn-icon" onClick={() => navigate(-1)}>
           <IconChevronRight size={20} />
@@ -73,41 +123,40 @@ export default function CookingMode() {
         <div style={{ width: 40 }} />
       </div>
 
-      {/* Progress */}
       <div className="cook-progress-bar-wrap">
         <div className="cook-progress-bar" style={{ width: `${progress}%` }} />
       </div>
       <div className="cook-progress-pct">{progress}% הושלם</div>
 
       <div className="cook-steps">
-        {/* Timer */}
-        <div className="cook-timer">
-          <div className="cook-timer-display">{fmtTime(seconds)}</div>
-          <div className="cook-timer-controls">
-            <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => setRunning(r => !r)}>
-              {running ? <><IconPlayerPause size={16} /> עצור</> : <><IconPlayerPlay size={16} /> הפעל</>}
-            </button>
-            <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => { setSeconds(0); setRunning(false) }}>
-              <IconRotate size={16} /> אפס
-            </button>
-          </div>
-        </div>
-
-        {/* Steps */}
         {steps.map((step, i) => {
           const isDone    = done.includes(i)
           const isCurrent = i === current
-          const isNext    = i > current
           const cls       = isDone ? 'done' : isCurrent ? 'current' : 'next'
+          const num       = step.step_number || step.order || i + 1
+          const text      = step.description || step.text || ''
+          const dur       = step.duration_seconds || null
+
           return (
-            <div key={i} className={`cook-step ${cls}`}>
+            <div
+              key={i}
+              className={`cook-step ${cls}`}
+              onClick={() => goToStep(i)}
+              style={{ cursor: isCurrent ? 'default' : 'pointer' }}
+            >
               <div className="cook-step-header">
-                <span className="cook-step-num">שלב {step.step_number}</span>
+                <span className="cook-step-num">שלב {num}</span>
                 {isDone && <span className="tag tag-green" style={{ fontSize: '.7rem' }}>✓ הושלם</span>}
               </div>
-              <div className="cook-step-text">{step.description}</div>
-              {isDone && (
-                <div className="cook-step-undo" onClick={() => undoStep(i)}>הושלם — לחצו לחזרה</div>
+              <div className="cook-step-text">{text}</div>
+
+              {isCurrent && dur && (
+                <StepTimer key={`${i}-${current}`} durationSeconds={dur} />
+              )}
+              {isDone && dur && (
+                <div style={{ fontSize: '.78rem', color: 'var(--text-muted)', marginTop: 4 }}>
+                  ⏱ {Math.round(dur / 60)} דקות
+                </div>
               )}
             </div>
           )
@@ -119,7 +168,7 @@ export default function CookingMode() {
           {current >= steps.length - 1 ? '🎉 סיימתי לבשל!' : 'סיימתי שלב זה'}
         </button>
         {current > 0 && (
-          <button className="btn btn-ghost btn-sm" onClick={() => setCurrent(c => c - 1)}>
+          <button className="btn btn-ghost btn-sm" onClick={() => goToStep(current - 1)}>
             חזרה לשלב הקודם
           </button>
         )}

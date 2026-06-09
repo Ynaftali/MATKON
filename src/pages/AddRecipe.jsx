@@ -136,6 +136,7 @@ export default function AddRecipe() {
       tags:         tags,
       is_public:    isPublic,
       image_url,
+      source_url:   inputType === 'link' ? url : null,
     }).select('id').single()
 
     setSaving(false)

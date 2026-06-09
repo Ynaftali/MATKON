@@ -2,8 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   IconChevronRight, IconShare, IconClock, IconUsers, IconStar,
-  IconMessageCircle, IconShoppingCart, IconAlertTriangle, IconLock,
-  IconHeart, IconSend
+  IconMessageCircle, IconShoppingCart, IconAlertTriangle, IconExternalLink,
+  IconHeart, IconSend, IconCheck
 } from '@tabler/icons-react'
 import { mockRecipes, CATEGORY_GRADIENTS } from '../lib/mock'
 import { supabase } from '../lib/supabase'
@@ -28,13 +28,21 @@ export default function RecipePage() {
   const [loading, setLoading]     = useState(true)
   const [servings, setServings]   = useState(4)
 
-  const [liked, setLiked]         = useState(false)
-  const [likeKey, setLikeKey]     = useState(0)
-  const [comments, setComments]   = useState([])
+  const [liked, setLiked]           = useState(false)
+  const [likeLoading, setLikeLoading] = useState(false)
+  const [toast, setToast]           = useState('')
+  const [shoppingOpen, setShoppingOpen] = useState(false)
+  const [shoppingDone, setShoppingDone] = useState({})
+  const [comments, setComments]     = useState([])
   const [newComment, setNewComment] = useState('')
-  const [sending, setSending]     = useState(false)
+  const [sending, setSending]       = useState(false)
   const { user: currentUser } = useAuth()
   const commentsEndRef = useRef(null)
+
+  function showToast(msg) {
+    setToast(msg)
+    setTimeout(() => setToast(''), 2500)
+  }
 
   useEffect(() => {
     loadRecipe()
@@ -66,6 +74,17 @@ export default function RecipePage() {
     }
     setLoading(false)
     loadComments(id)
+    if (currentUser) loadLike(id)
+  }
+
+  async function loadLike(recipeId) {
+    const { data } = await supabase
+      .from('likes')
+      .select('id')
+      .eq('recipe_id', recipeId)
+      .eq('user_id', currentUser.id)
+      .maybeSingle()
+    setLiked(!!data)
   }
 
   const ratio     = recipe ? servings / (recipe.servings || 4) : 1
@@ -105,9 +124,33 @@ export default function RecipePage() {
     }
   }
 
-  function toggleLike() {
-    setLiked(l => !l)
-    setLikeKey(k => k + 1)
+  async function toggleLike() {
+    if (!currentUser) { navigate('/login'); return }
+    if (likeLoading) return
+    setLikeLoading(true)
+    if (liked) {
+      await supabase.from('likes').delete().eq('recipe_id', id).eq('user_id', currentUser.id)
+      setLiked(false)
+    } else {
+      await supabase.from('likes').insert({ recipe_id: id, user_id: currentUser.id })
+      setLiked(true)
+    }
+    setLikeLoading(false)
+  }
+
+  async function handleShare() {
+    const url = `https://matkon.co/recipe/${id}`
+    if (navigator.share) {
+      try { await navigator.share({ title: recipe.title, text: recipe.description, url }) } catch {}
+    } else {
+      await navigator.clipboard.writeText(url)
+      showToast('הקישור הועתק ✓')
+    }
+  }
+
+  function openShopping() {
+    setShoppingDone({})
+    setShoppingOpen(true)
   }
 
   function fmtQty(qty) {
@@ -144,18 +187,14 @@ export default function RecipePage() {
           </button>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
-              key={likeKey}
               className={`btn-icon like-btn${liked ? ' liked' : ''}`}
               onClick={toggleLike}
+              disabled={likeLoading}
               aria-label={liked ? 'הסירו מהאהובים' : 'הוסיפו לאהובים'}
             >
-              <IconHeart
-                size={20}
-                fill={liked ? '#e05252' : 'none'}
-                color={liked ? '#e05252' : 'currentColor'}
-              />
+              <IconHeart size={20} fill={liked ? '#e05252' : 'none'} color={liked ? '#e05252' : 'currentColor'} />
             </button>
-            <button className="btn-icon">
+            <button className="btn-icon" onClick={handleShare} aria-label="שיתוף">
               <IconShare size={20} />
             </button>
           </div>
@@ -200,12 +239,16 @@ export default function RecipePage() {
           </div>
         </div>
 
-        {/* Source lock */}
         {recipe.source_url && (
-          <div className="source-box">
-            <IconLock size={18} />
-            <span>מקור: {recipe.source_url}</span>
-          </div>
+          <a
+            href={recipe.source_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="source-credit"
+          >
+            <IconExternalLink size={14} />
+            מקור המתכון
+          </a>
         )}
 
         {/* Ingredients */}
@@ -328,14 +371,50 @@ export default function RecipePage() {
           )}
         </div>
 
-        {/* Actions */}
-        <button className="btn btn-ghost" style={{ marginBottom: 12 }}>
-          <IconShoppingCart size={18} /> הוסיפו לרשימת קניות
+        <button className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={openShopping}>
+          <IconShoppingCart size={18} /> רשימת קניות
         </button>
         <button className="btn btn-primary" onClick={() => navigate(`/cook/${recipe.id}`)}>
           🍳 התחילו לבשל
         </button>
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className="toast">{toast}</div>
+      )}
+
+      {/* Shopping list drawer */}
+      {shoppingOpen && (
+        <div className="drawer-overlay" onClick={() => setShoppingOpen(false)}>
+          <div className="drawer" onClick={e => e.stopPropagation()}>
+            <div className="drawer-header">
+              <span className="drawer-title">רשימת קניות — {recipe.title}</span>
+              <button className="btn-icon" onClick={() => setShoppingOpen(false)}>✕</button>
+            </div>
+            <div className="drawer-body">
+              {recipe.ingredients?.map((ing, idx) => {
+                const name = ing.name_he || ing.name || ''
+                const qty  = ing.quantity || ing.amount || ''
+                const unit = ing.unit || ''
+                const key  = `${idx}`
+                return (
+                  <label key={key} className={`shopping-item ${shoppingDone[key] ? 'checked' : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={!!shoppingDone[key]}
+                      onChange={() => setShoppingDone(d => ({ ...d, [key]: !d[key] }))}
+                      style={{ display: 'none' }}
+                    />
+                    <div className="shopping-check">{shoppingDone[key] ? <IconCheck size={14} /> : ''}</div>
+                    <span className="shopping-name">{qty} {unit} {name}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       <BottomNav />
     </div>

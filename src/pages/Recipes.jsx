@@ -10,6 +10,7 @@ const TABS = [
   { id: 'mine',      label: 'המתכונים שלי' },
   { id: 'community', label: 'קהילה'         },
   { id: 'saved',     label: 'שמורים'        },
+  { id: 'liked',     label: 'אהבתי'         },
 ]
 
 function RecipeCard({ recipe, onClick }) {
@@ -56,10 +57,14 @@ export default function Recipes() {
   const [myRecipes, setMyRecipes]   = useState([])
   const [community, setCommunity]   = useState(mockRecipes)
   const [saved, setSaved]           = useState([])
+  const [liked, setLiked]           = useState([])
   const [loading, setLoading]       = useState(false)
 
   useEffect(() => {
-    if (!authLoading && user) loadMyRecipes(user.id)
+    if (!authLoading && user) {
+      loadMyRecipes(user.id)
+      loadLiked(user.id)
+    }
   }, [user, authLoading])
 
   async function loadMyRecipes(userId) {
@@ -71,6 +76,21 @@ export default function Recipes() {
       .order('created_at', { ascending: false })
     setMyRecipes(data || [])
     setLoading(false)
+  }
+
+  async function loadLiked(userId) {
+    const { data: likeRows } = await supabase
+      .from('likes')
+      .select('recipe_id')
+      .eq('user_id', userId)
+    if (!likeRows?.length) return
+    const ids = likeRows.map(l => l.recipe_id)
+    const { data } = await supabase
+      .from('recipes')
+      .select('*')
+      .in('id', ids)
+      .order('created_at', { ascending: false })
+    setLiked(data || [])
   }
 
   return (
@@ -141,6 +161,21 @@ export default function Recipes() {
               <EmptyState icon="🔖" text="עדיין אין מתכונים שמורים" sub="לחצו על הסימנייה בכל מתכון כדי לשמור אותו" />
             )}
             {saved.map(r => (
+              <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`)} />
+            ))}
+          </>
+        )}
+
+        {/* ── אהבתי ── */}
+        {tab === 'liked' && (
+          <>
+            {!authLoading && !user && (
+              <EmptyState icon="🔒" text="צריך להתחבר" sub="התחברו כדי לראות מתכונים שאהבתם" btnText="כניסה לחשבון" onBtn={() => navigate('/login')} />
+            )}
+            {user && liked.length === 0 && (
+              <EmptyState icon="❤️" text="עדיין לא אהבתם מתכונים" sub='לחצו על ❤️ בכל מתכון כדי לשמור אותו כאן' />
+            )}
+            {liked.map(r => (
               <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`)} />
             ))}
           </>

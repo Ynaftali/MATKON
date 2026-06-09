@@ -66,7 +66,7 @@ export default async function handler(req, res) {
     { "amount": "2", "unit": "כפות", "name": "שמן זית" }
   ],
   "steps": [
-    { "order": 1, "text": "תיאור השלב" }
+    { "order": 1, "text": "תיאור השלב", "duration_seconds": null }
   ],
   "prep_time": 10,
   "cook_time": 20,
@@ -81,7 +81,8 @@ export default async function handler(req, res) {
 - תרגם לעברית אם הטקסט באנגלית
 - אם חסר מידע, השתמש בערכי ברירת מחדל הגיוניים
 - tags: בחר 2-4 תגיות רלוונטיות
-- image_search: 2-3 מילים באנגלית שמתארות את המנה לחיפוש תמונה (לדוגמה: "grilled chicken", "chocolate cake")`
+- image_search: 2-3 מילים באנגלית שמתארות את המנה לחיפוש תמונה (לדוגמה: "grilled chicken", "chocolate cake")
+- duration_seconds: אם בשלב כתוב זמן (למשל "בשלו 40 דקות", "אפו 30 דקות") - המר לשניות (2400, 1800). אחרת null`
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
