@@ -22,10 +22,10 @@ function timeAgo(ts) {
 export default function RecipePage() {
   const { id }     = useParams()
   const navigate   = useNavigate()
-  const recipe     = mockRecipes.find(r => r.id === id) || mockRecipes[0]
-  const user       = recipe.users || {}
-  const [servings, setServings] = useState(recipe.servings || 4)
-  const ratio      = servings / (recipe.servings || 4)
+
+  const [recipe, setRecipe]       = useState(null)
+  const [loading, setLoading]     = useState(true)
+  const [servings, setServings]   = useState(4)
 
   const [liked, setLiked]         = useState(false)
   const [likeKey, setLikeKey]     = useState(0)
@@ -35,20 +35,43 @@ export default function RecipePage() {
   const [currentUser, setCurrentUser] = useState(null)
   const commentsEndRef = useRef(null)
 
-  const gradient  = CATEGORY_GRADIENTS[recipe.category] || 'linear-gradient(160deg, #1e3a6e, #3d6fa8)'
-  const rareItems = recipe.ingredients?.filter(i => i.is_rare) || []
-
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setCurrentUser(data?.user || null))
-    loadComments()
-  }, [recipe.id])
+    loadRecipe()
+  }, [id])
 
-  async function loadComments() {
+  async function loadRecipe() {
+    setLoading(true)
+    // Try Supabase first
+    const { data } = await supabase
+      .from('recipes')
+      .select('*, users(full_name, country, country_flag, city)')
+      .eq('id', id)
+      .single()
+    if (data) {
+      setRecipe(data)
+      setServings(data.servings || 4)
+    } else {
+      // Fall back to mock
+      const mock = mockRecipes.find(r => r.id === id) || mockRecipes[0]
+      setRecipe(mock)
+      setServings(mock.servings || 4)
+    }
+    setLoading(false)
+    loadComments(id)
+  }
+
+  const ratio     = recipe ? servings / (recipe.servings || 4) : 1
+  const gradient  = CATEGORY_GRADIENTS[recipe?.category] || 'linear-gradient(160deg, #1e3a6e, #3d6fa8)'
+  const rareItems = recipe?.ingredients?.filter(i => i.is_rare) || []
+  const user      = recipe?.users || {}
+
+  async function loadComments(recipeId) {
     try {
       const { data } = await supabase
         .from('recipe_comments')
         .select('id, content, created_at, users(full_name, country_flag, country)')
-        .eq('recipe_id', recipe.id)
+        .eq('recipe_id', recipeId || id)
         .order('created_at', { ascending: true })
       if (data) setComments(data)
     } catch {
@@ -62,7 +85,7 @@ export default function RecipePage() {
     try {
       const { data, error } = await supabase
         .from('recipe_comments')
-        .insert({ recipe_id: recipe.id, user_id: currentUser.id, content: newComment.trim() })
+        .insert({ recipe_id: id, user_id: currentUser.id, content: newComment.trim() })
         .select('id, content, created_at, users(full_name, country_flag, country)')
         .single()
       if (!error && data) {
@@ -92,6 +115,12 @@ export default function RecipePage() {
     const m = Math.round(s / 60)
     return m >= 60 ? `${Math.floor(m/60)}ש' ${m%60}ד'` : `${m} דקות`
   }
+
+  if (loading || !recipe) return (
+    <div className="page" style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh' }}>
+      <p style={{ color:'var(--text-muted)' }}>טוענים מתכון...</p>
+    </div>
+  )
 
   return (
     <div className="rpage">
@@ -183,16 +212,22 @@ export default function RecipePage() {
             </div>
           </div>
 
-          {recipe.ingredients?.map(ing => (
-            <div key={ing.id} className="ingredient-row">
-              <div className="ingredient-qty">{fmtQty(ing.quantity)} {ing.unit}</div>
-              <div className="ingredient-names">
-                <div className="ingredient-he">{ing.name_he}</div>
-                <div className="ingredient-local">{ing.name_local}</div>
+          {recipe.ingredients?.map((ing, idx) => {
+            // Support both mock format { name_he, quantity, unit } and AI format { name, amount, unit }
+            const name = ing.name_he || ing.name || ''
+            const qty  = ing.quantity || ing.amount || ''
+            const unit = ing.unit || ''
+            return (
+              <div key={ing.id || idx} className="ingredient-row">
+                <div className="ingredient-qty">{fmtQty(qty)} {unit}</div>
+                <div className="ingredient-names">
+                  <div className="ingredient-he">{name}</div>
+                  {ing.name_local && <div className="ingredient-local">{ing.name_local}</div>}
+                </div>
+                {ing.is_rare && <span className="tag tag-rare"><IconAlertTriangle size={11} /> נדיר</span>}
               </div>
-              {ing.is_rare && <span className="tag tag-rare"><IconAlertTriangle size={11} /> נדיר</span>}
-            </div>
-          ))}
+            )
+          })}
 
           {rareItems.length > 0 && (
             <div className="rare-box">
@@ -210,17 +245,21 @@ export default function RecipePage() {
         {/* Steps */}
         <div className="rpage-section">
           <div className="section-title" style={{ marginBottom: 8 }}>שלבי הכנה</div>
-          {recipe.steps?.map(step => (
-            <div key={step.step_number} className="step-row">
-              <div className="step-num">{step.step_number}</div>
-              <div className="step-text">
-                {step.description}
+          {recipe.steps?.map((step, idx) => {
+            // Support both mock format { step_number, description } and AI format { order, text }
+            const num  = step.step_number || step.order || idx + 1
+            const text = step.description || step.text || ''
+            return (
+            <div key={num} className="step-row">
+              <div className="step-num">{num}</div>
+              <div className="step-text">{text}
                 {step.duration_seconds && (
                   <div className="step-duration"><IconClock size={12} /> {fmtDuration(step.duration_seconds)}</div>
                 )}
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
 
         {/* Comments */}
