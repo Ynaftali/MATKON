@@ -1,10 +1,22 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/AuthContext'
 
 export default function CompleteProfile() {
   const navigate = useNavigate()
-  const [city, setCity] = useState('')
-  const [bio, setBio] = useState('')
+  const { user } = useAuth()
+  const [city, setCity]     = useState('')
+  const [bio, setBio]       = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function save() {
+    if (!user) { navigate('/feed'); return }
+    setLoading(true)
+    await supabase.from('users').upsert({ id: user.id, city, bio })
+    setLoading(false)
+    navigate('/feed')
+  }
 
   return (
     <div className="auth-page">
@@ -37,11 +49,15 @@ export default function CompleteProfile() {
           />
         </div>
 
-        <button className="btn btn-green" onClick={() => navigate('/feed')}>
-          לקהילה
+        <button className="btn btn-primary" onClick={save} disabled={loading}>
+          {loading ? 'שומר...' : 'לקהילה'}
         </button>
 
-        <button className="btn btn-text" style={{ textAlign: 'center' }} onClick={() => navigate('/feed')}>
+        <button
+          className="btn btn-text"
+          style={{ textAlign: 'center', display: 'block', width: '100%' }}
+          onClick={() => navigate('/feed')}
+        >
           אולי אחר כן, קחו אותי לקהילה
         </button>
       </div>

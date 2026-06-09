@@ -29,6 +29,7 @@ import MapPage         from './pages/MapPage'
 import Community       from './pages/Community'
 import Recipes         from './pages/Recipes'
 import VerifyEmail     from './pages/VerifyEmail'
+import Terms          from './pages/Terms'
 
 export default function App() {
   return (
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/recipes"             element={<Recipes />}      />
         <Route path="/verify-email"        element={<VerifyEmail />}  />
         <Route path="/auth/callback"       element={<AuthCallback />} />
+        <Route path="/terms"               element={<Terms />}        />
         <Route path="*"                    element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>

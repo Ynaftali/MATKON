@@ -1,8 +1,8 @@
 :root {
-  --bg:          #102947;
-  --bg-card:     #163354;
-  --bg-elevated: #1a3d63;
-  --bg-mid:      #1e3a6e;
+  --bg:          #080d1c;
+  --bg-card:     #0f1d32;
+  --bg-elevated: #152640;
+  --bg-mid:      #1a3354;
   --blue:        #3d6fa8;
   --blue-light:  #a8c8f0;
   --green:       #5ecb8a;
@@ -237,12 +237,10 @@ p  { line-height: 1.6; }
 .auth-footer a { color: var(--blue-light); cursor: pointer; }
 
 /* Password strength */
-.pw-strength { display: flex; gap: 4px; margin-top: 6px; }
-.pw-bar { flex: 1; height: 3px; border-radius: 2px; background: var(--border-mid); transition: background .3s; }
-.pw-bar.weak   { background: var(--red); }
-.pw-bar.medium { background: #f0a030; }
-.pw-bar.strong { background: var(--green); }
-.pw-label { font-size: .75rem; color: var(--text-muted); margin-top: 4px; }
+.pw-rules { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.pw-rule  { display: flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--text-muted); transition: color .2s; }
+.pw-rule.ok { color: var(--green); }
+.pw-rule-icon { font-size: .85rem; width: 14px; text-align: center; }
 .pw-match { font-size: .75rem; margin-top: 4px; }
 .pw-match.ok  { color: var(--green); }
 .pw-match.err { color: var(--red); }
