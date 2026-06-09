@@ -43,19 +43,26 @@ export default function RecipePage() {
   async function loadRecipe() {
     setLoading(true)
     // Try Supabase first
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('recipes')
-      .select('*, users(full_name, country, country_flag, city)')
+      .select('*')
       .eq('id', id)
       .single()
+    console.log('[RecipePage] id=', id, 'data=', data, 'error=', error)
     if (data) {
       setRecipe(data)
       setServings(data.servings || 4)
     } else {
-      // Fall back to mock
-      const mock = mockRecipes.find(r => r.id === id) || mockRecipes[0]
-      setRecipe(mock)
-      setServings(mock.servings || 4)
+      // Fall back to mock only for mock IDs (not UUIDs)
+      const mock = mockRecipes.find(r => r.id === id)
+      if (mock) {
+        setRecipe(mock)
+        setServings(mock.servings || 4)
+      } else {
+        // Real UUID but not found — go back
+        navigate(-1)
+        return
+      }
     }
     setLoading(false)
     loadComments(id)
