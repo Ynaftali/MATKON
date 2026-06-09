@@ -7,6 +7,7 @@ import {
 } from '@tabler/icons-react'
 import { mockRecipes, CATEGORY_GRADIENTS } from '../lib/mock'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/AuthContext'
 import BottomNav from '../components/BottomNav'
 
 function timeAgo(ts) {
@@ -32,11 +33,10 @@ export default function RecipePage() {
   const [comments, setComments]   = useState([])
   const [newComment, setNewComment] = useState('')
   const [sending, setSending]     = useState(false)
-  const [currentUser, setCurrentUser] = useState(null)
+  const { user: currentUser } = useAuth()
   const commentsEndRef = useRef(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setCurrentUser(data?.user || null))
     loadRecipe()
   }, [id])
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { IconHeart, IconMessageCircle, IconBookmark } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
 import { mockRecipes, CATEGORY_GRADIENTS } from '../lib/mock'
+import { useAuth } from '../lib/AuthContext'
 import BottomNav from '../components/BottomNav'
 
 const TABS = [
@@ -50,19 +51,16 @@ function EmptyState({ icon, text, sub, btnText, onBtn }) {
 
 export default function Recipes() {
   const navigate = useNavigate()
+  const { user, loading: authLoading } = useAuth()
   const [tab, setTab]               = useState('mine')
   const [myRecipes, setMyRecipes]   = useState([])
   const [community, setCommunity]   = useState(mockRecipes)
   const [saved, setSaved]           = useState([])
   const [loading, setLoading]       = useState(false)
-  const [user, setUser]             = useState(null)
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data?.user || null)
-      if (data?.user) loadMyRecipes(data.user.id)
-    })
-  }, [])
+    if (!authLoading && user) loadMyRecipes(user.id)
+  }, [user, authLoading])
 
   async function loadMyRecipes(userId) {
     setLoading(true)
@@ -109,7 +107,7 @@ export default function Recipes() {
         {/* ── המתכונים שלי ── */}
         {tab === 'mine' && (
           <>
-            {!user && (
+            {!authLoading && !user && (
               <EmptyState icon="🔒" text="צריך להתחבר" sub="התחברו כדי לראות את המתכונים שלכם" btnText="כניסה לחשבון" onBtn={() => navigate('/login')} />
             )}
             {user && loading && <p style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>טוענים...</p>}

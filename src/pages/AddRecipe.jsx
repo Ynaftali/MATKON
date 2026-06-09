@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/AuthContext'
 import { IconChevronRight, IconFlame, IconPencil, IconLink, IconCamera, IconPlus, IconX, IconLock, IconWorld, IconBrandWhatsapp, IconBrandInstagram, IconBrandFacebook, IconCopy } from '@tabler/icons-react'
 
 const AI_STEPS = [
@@ -28,6 +29,7 @@ function StepDots({ current }) {
 
 export default function AddRecipe() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [step, setStep]           = useState(1)
   const [inputType, setInputType] = useState('text')
   const [text, setText]           = useState('')
@@ -92,7 +94,6 @@ export default function AddRecipe() {
     setSaving(true)
     setSaveError('')
 
-    const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
       navigate('/login')
       return

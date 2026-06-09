@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import { supabase } from './lib/supabase'
+import { AuthProvider } from './lib/AuthContext'
 
 function AuthCallback() {
   const navigate = useNavigate()
@@ -31,6 +32,7 @@ import VerifyEmail     from './pages/VerifyEmail'
 
 export default function App() {
   return (
+    <AuthProvider>
     <BrowserRouter>
       <Routes>
         <Route path="/"                 element={<Splash />}          />
@@ -52,5 +54,6 @@ export default function App() {
         <Route path="*"                    element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>
+    </AuthProvider>
   )
 }
