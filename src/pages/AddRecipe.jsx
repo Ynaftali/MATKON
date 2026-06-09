@@ -99,6 +99,18 @@ export default function AddRecipe() {
       return
     }
 
+    // Auto-assign a food image based on category
+    const CATEGORY_IMAGES = {
+      'בשרי':        'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&q=80',
+      'חלבי':        'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80',
+      'טבעוני':      'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&q=80',
+      'ארוחת בוקר': 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=800&q=80',
+      'קינוחים':     'https://images.unsplash.com/photo-1488477181228-c84a4bb4b8b7?w=800&q=80',
+      'שתייה':       'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=800&q=80',
+      'אחר':         'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80',
+    }
+    const image_url = CATEGORY_IMAGES[recipe.category] || CATEGORY_IMAGES['אחר']
+
     const { data, error } = await supabase.from('recipes').insert({
       user_id:      user.id,
       title:        recipe.title,
@@ -111,6 +123,7 @@ export default function AddRecipe() {
       category:     recipe.category    || 'אחר',
       tags:         tags,
       is_public:    isPublic,
+      image_url,
     }).select('id').single()
 
     setSaving(false)

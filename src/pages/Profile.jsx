@@ -57,9 +57,6 @@ export default function Profile() {
         <div className="avatar avatar-xl">{initials}</div>
         <div className="profile-name">{fullName}</div>
         {country && <div className="profile-location">🇮🇱 {country}</div>}
-        <div className="profile-bio" style={{ color:'var(--text-muted)', fontSize:'.85rem', marginTop:4 }}>
-          {user?.email}
-        </div>
         <button className="btn btn-ghost btn-sm" style={{ width:'auto', marginTop:8 }} onClick={() => {}}>
           <IconEdit size={14} /> עריכת פרופיל
         </button>
