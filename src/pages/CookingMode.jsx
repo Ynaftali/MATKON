@@ -1,31 +1,26 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { IconChevronRight, IconPlayerPlay, IconPlayerPause, IconRotate, IconCheck } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
 import { mockRecipes } from '../lib/mock'
 
 function parseHebrewDuration(text) {
   if (!text) return null
-  // Dual forms (no digit)
   if (/שעתיים/.test(text)) return 7200
   if (/דקתיים/.test(text)) return 120
-  // "חצי שעה" = 30 min
   if (/חצי\s*שעה/.test(text)) return 1800
-  // "רבע שעה" = 15 min, "שלוש רבעי שעה" = 45 min
   if (/שלוש\s*רבעי\s*שעה/.test(text)) return 2700
   if (/רבע\s*שעה/.test(text)) return 900
-  // Written Hebrew numbers + unit
   const hebrewNums = {
     'אחת': 1, 'אחד': 1, 'שתי': 2, 'שתיים': 2, 'שלוש': 3, 'ארבע': 4,
     'חמש': 5, 'שש': 6, 'שבע': 7, 'שמונה': 8, 'תשע': 9, 'עשר': 10,
-    'אחת עשרה': 11, 'שתים עשרה': 12, 'חמש עשרה': 15, 'עשרים': 20, 'שלושים': 30,
-    'ארבעים': 40, 'חמישים': 50,
+    'אחת עשרה': 11, 'שתים עשרה': 12, 'חמש עשרה': 15,
+    'עשרים': 20, 'שלושים': 30, 'ארבעים': 40, 'חמישים': 50,
   }
   for (const [word, val] of Object.entries(hebrewNums)) {
     if (new RegExp(word + '\\s+(?:שעות|שעה)').test(text)) return val * 3600
     if (new RegExp(word + '\\s+(?:דקות|דקה)').test(text)) return val * 60
   }
-  // Digit + unit (must come after written-number check)
   const m = text.match(/(\d+(?:\.\d+)?)\s*(שעות?|שעה|דקות?|דקה|שניות?|שנייה)/)
   if (!m) return null
   const n = parseFloat(m[1])
@@ -42,18 +37,54 @@ function fmtCountdown(s) {
   return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
 }
 
-function StepTimer({ durationSeconds }) {
-  const [remaining, setRemaining] = useState(durationSeconds)
-  const [running, setRunning]     = useState(false)
-  const [finished, setFinished]   = useState(false)
+function StepTimer({ durationSeconds, storageKey }) {
+  // Restore state from localStorage, accounting for elapsed time if was running
+  function loadState() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || 'null')
+      if (!saved) return { remaining: durationSeconds, running: false, finished: false }
+      if (saved.finished) return { remaining: 0, running: false, finished: true }
+      if (saved.running && saved.runningAt) {
+        const elapsed  = Math.round((Date.now() - saved.runningAt) / 1000)
+        const remaining = Math.max(0, (saved.remaining ?? durationSeconds) - elapsed)
+        if (remaining === 0) return { remaining: 0, running: false, finished: true }
+        return { remaining, running: true, finished: false }
+      }
+      return { remaining: saved.remaining ?? durationSeconds, running: false, finished: false }
+    } catch {
+      return { remaining: durationSeconds, running: false, finished: false }
+    }
+  }
+
+  const init = loadState()
+  const [remaining, setRemaining] = useState(init.remaining)
+  const [running, setRunning]     = useState(init.running)
+  const [finished, setFinished]   = useState(init.finished)
   const intervalRef               = useRef(null)
+  const runningAtRef              = useRef(init.running ? Date.now() - (durationSeconds - init.remaining) * 1000 : null)
+
+  function persist(r, run, fin, startAt) {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({
+        remaining: r, running: run, finished: fin,
+        runningAt: run ? (startAt ?? Date.now()) : null,
+      }))
+    } catch {}
+  }
 
   useEffect(() => {
     if (running && remaining > 0) {
       intervalRef.current = setInterval(() => {
         setRemaining(r => {
-          if (r <= 1) { clearInterval(intervalRef.current); setRunning(false); setFinished(true); return 0 }
-          return r - 1
+          const next = r - 1
+          if (next <= 0) {
+            clearInterval(intervalRef.current)
+            setRunning(false)
+            setFinished(true)
+            persist(0, false, true, null)
+            return 0
+          }
+          return next
         })
       }, 1000)
     } else {
@@ -62,7 +93,21 @@ function StepTimer({ durationSeconds }) {
     return () => clearInterval(intervalRef.current)
   }, [running])
 
-  function reset() { setRemaining(durationSeconds); setRunning(false); setFinished(false) }
+  function toggleRunning() {
+    const nowRunning = !running
+    setRunning(nowRunning)
+    if (nowRunning) {
+      runningAtRef.current = Date.now()
+    }
+    persist(remaining, nowRunning, finished, nowRunning ? Date.now() : null)
+  }
+
+  function reset() {
+    setRemaining(durationSeconds)
+    setRunning(false)
+    setFinished(false)
+    persist(durationSeconds, false, false, null)
+  }
 
   return (
     <div className={`step-timer ${finished ? 'done' : running ? 'running' : ''}`} onClick={e => e.stopPropagation()}>
@@ -70,7 +115,7 @@ function StepTimer({ durationSeconds }) {
         {finished ? '✓ הסתיים' : fmtCountdown(remaining)}
       </div>
       <div className="step-timer-controls">
-        <button className="step-timer-btn" onClick={() => setRunning(r => !r)} disabled={finished}>
+        <button className="step-timer-btn" onClick={toggleRunning} disabled={finished}>
           {running ? <IconPlayerPause size={14} /> : <IconPlayerPlay size={14} />}
           {running ? 'עצור' : 'הפעל'}
         </button>
@@ -83,15 +128,23 @@ function StepTimer({ durationSeconds }) {
 }
 
 export default function CookingMode() {
-  const { id }    = useParams()
-  const navigate  = useNavigate()
+  const { id }      = useParams()
+  const navigate    = useNavigate()
+  const { state }   = useLocation()
 
-  const [recipe, setRecipe]       = useState(null)
-  const [loading, setLoading]     = useState(true)
-  const [done, setDone]           = useState(new Set())
-  const [activeStep, setActiveStep] = useState(0)
+  const [recipe, setRecipe]         = useState(state?.recipe || null)
+  const [loading, setLoading]       = useState(!state?.recipe)
+  const [done, setDone]             = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem(`matkon_cook_done_${id}`) || '[]')) }
+    catch { return new Set() }
+  })
+  const [activeStep, setActiveStep] = useState(() => {
+    try { return parseInt(localStorage.getItem(`matkon_cook_step_${id}`) || '0', 10) || 0 }
+    catch { return 0 }
+  })
 
   useEffect(() => {
+    if (state?.recipe) return // already have recipe from navigation
     async function load() {
       const { data } = await supabase.from('recipes').select('*').eq('id', id).single()
       setRecipe(data || mockRecipes.find(r => r.id === id) || null)
@@ -99,6 +152,14 @@ export default function CookingMode() {
     }
     load()
   }, [id])
+
+  // Persist done + activeStep
+  useEffect(() => {
+    try { localStorage.setItem(`matkon_cook_done_${id}`, JSON.stringify([...done])) } catch {}
+  }, [done])
+  useEffect(() => {
+    try { localStorage.setItem(`matkon_cook_step_${id}`, String(activeStep)) } catch {}
+  }, [activeStep])
 
   if (loading) return (
     <div className="cook-page" style={{ display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -118,7 +179,6 @@ export default function CookingMode() {
         next.delete(i)
       } else {
         next.add(i)
-        // Move active to next undone step
         if (i === activeStep) {
           const nextUndone = steps.findIndex((_, idx) => idx > i && !next.has(idx))
           if (nextUndone !== -1) setActiveStep(nextUndone)
@@ -129,6 +189,11 @@ export default function CookingMode() {
   }
 
   if (allDone) {
+    // Clear saved progress
+    try {
+      localStorage.removeItem(`matkon_cook_done_${id}`)
+      localStorage.removeItem(`matkon_cook_step_${id}`)
+    } catch {}
     return (
       <div className="cook-page">
         <div className="cook-finish">
@@ -156,13 +221,13 @@ export default function CookingMode() {
 
       <div className="cook-steps">
         {steps.map((step, i) => {
-          const isDone  = done.has(i)
-          const num     = step.step_number || step.order || i + 1
-          const text    = step.description || step.text || ''
-          const dur     = step.duration_seconds || parseHebrewDuration(text) || null
-          const isCur   = i === activeStep && !isDone
-          const isNext  = !isDone && !isCur && i > activeStep
-          const cls     = isDone ? 'done' : isCur ? 'current' : isNext ? 'next' : ''
+          const isDone = done.has(i)
+          const num    = step.step_number || step.order || i + 1
+          const text   = step.description || step.text || ''
+          const dur    = step.duration_seconds || parseHebrewDuration(text) || null
+          const isCur  = i === activeStep && !isDone
+          const isNext = !isDone && !isCur && i > activeStep
+          const cls    = isDone ? 'done' : isCur ? 'current' : isNext ? 'next' : ''
           return (
             <div
               key={i}
@@ -180,7 +245,13 @@ export default function CookingMode() {
                 </div>
               </div>
               <div className="cook-step-text">{text}</div>
-              {dur && <StepTimer key={`timer-${i}`} durationSeconds={dur} />}
+              {dur && (
+                <StepTimer
+                  key={`timer-${i}`}
+                  durationSeconds={dur}
+                  storageKey={`matkon_timer_${id}_${i}`}
+                />
+              )}
             </div>
           )
         })}

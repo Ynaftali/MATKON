@@ -212,22 +212,14 @@ export default function RecipePage() {
     <div className="rpage">
       {/* Hero */}
       <div className="rpage-hero" style={{ background: gradient }}>
-        {(() => {
-          const term   = recipe.title || 'food'
-          const seed   = Math.abs(Array.from(term).reduce((h,c) => (h*31+c.charCodeAt(0))|0, 0))
-          const p      = encodeURIComponent(`${term}, appetizing food photography, natural lighting`)
-          const imgSrc = recipe.image_url || `https://image.pollinations.ai/prompt/${p}?seed=${seed}&nologo=true&model=flux-schnell&width=800&height=600`
-          return (
-            <img
-              src={imgSrc}
-              alt={recipe.title}
-              className="rpage-hero-bg"
-              style={{ opacity: recipe.image_url ? 1 : 0, transition: 'opacity 0.6s' }}
-              onLoad={e => { e.target.style.opacity = 1 }}
-              onError={e => { e.target.style.display = 'none' }}
-            />
-          )
-        })()}
+        {recipe.image_url && (
+          <img
+            src={recipe.image_url}
+            alt={recipe.title}
+            className="rpage-hero-bg"
+            onError={e => { e.target.style.display = 'none' }}
+          />
+        )}
         <div className="rpage-hero-overlay" />
         <div className="rpage-hero-top">
           <button className="btn-icon" onClick={() => navigate(-1)}>
@@ -258,14 +250,23 @@ export default function RecipePage() {
         {/* Title & author */}
         <div className="rpage-title">{recipe.title}</div>
 
-        <div className="rpage-author">
-          <div className="avatar avatar-md">
-            {(user.full_name || 'א')[0]}
+        <div className="rpage-author" style={{ justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <div className="avatar avatar-md">
+              {(user.full_name || 'א')[0]}
+            </div>
+            <div className="rpage-author-info">
+              <div className="rpage-author-name">🇮🇱 {countryFlag(user.country)} {user.full_name}</div>
+              <div className="rpage-author-loc">{[user.city, user.country].filter(Boolean).join(', ')}</div>
+            </div>
           </div>
-          <div className="rpage-author-info">
-            <div className="rpage-author-name">🇮🇱 {countryFlag(user.country)} {user.full_name}</div>
-            <div className="rpage-author-loc">{[user.city, user.country].filter(Boolean).join(', ')}</div>
-          </div>
+          <button
+            className="btn btn-primary"
+            style={{ padding: '8px 16px', fontSize: '.85rem', whiteSpace: 'nowrap', flexShrink: 0 }}
+            onClick={() => navigate(`/cook/${recipe.id}`, { state: { recipe } })}
+          >
+            🍳 בישול
+          </button>
         </div>
 
         {/* Stats */}
@@ -420,14 +421,11 @@ export default function RecipePage() {
           )}
         </div>
 
-        <button className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={() => {
+        <button className="btn btn-ghost" onClick={() => {
           addIngredientsToList(recipe.ingredients || [], recipe.title)
           openShopping()
         }}>
           <IconShoppingCart size={18} /> הוסף לרשימת קניות
-        </button>
-        <button className="btn btn-primary" onClick={() => navigate(`/cook/${recipe.id}`)}>
-          🍳 התחילו לבשל
         </button>
       </div>
 
