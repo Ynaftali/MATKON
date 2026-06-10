@@ -42,10 +42,13 @@ export default function AddRecipe() {
   const [newTag, setNewTag]       = useState('')
   const [isPublic, setIsPublic]   = useState(true)
   const [copied, setCopied]       = useState(false)
-  const [saving, setSaving]       = useState(false)
-  const [saveError, setSaveError] = useState('')
-  const [savedId, setSavedId]     = useState(null)
-  const fileRef = useRef()
+  const [saving, setSaving]         = useState(false)
+  const [saveError, setSaveError]   = useState('')
+  const [savedId, setSavedId]       = useState(null)
+  const [recipeImageFile, setRecipeImageFile] = useState(null)
+  const [recipeImagePreview, setRecipeImagePreview] = useState(null)
+  const fileRef     = useRef()
+  const recipeImgRef = useRef()
 
   async function runAI() {
     setStep(2)
@@ -110,18 +113,47 @@ export default function AddRecipe() {
       'שתייה':       'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=800&q=80',
       'אחר':         'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80',
     }
-    let image_url = FALLBACK_IMAGES[recipe.category] || FALLBACK_IMAGES['אחר']
-    try {
-      // TheMealDB: search using English term returned by AI
-      const searchTerm = recipe.image_search || ''
-      if (searchTerm) {
-        const res = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(searchTerm)}`)
-        const json = await res.json()
-        if (json.meals?.[0]?.strMealThumb) {
-          image_url = json.meals[0].strMealThumb
+    let image_url = null
+
+    // 1. User uploaded their own photo → upload to Supabase Storage
+    if (recipeImageFile) {
+      try {
+        const ext  = recipeImageFile.name.split('.').pop().toLowerCase() || 'jpg'
+        const path = `${user.id}/${Date.now()}.${ext}`
+        const { data: upData, error: upErr } = await supabase.storage
+          .from('recipe-images')
+          .upload(path, recipeImageFile, { contentType: recipeImageFile.type, upsert: false })
+        if (!upErr && upData) {
+          const { data: { publicUrl } } = supabase.storage.from('recipe-images').getPublicUrl(path)
+          image_url = publicUrl
         }
-      }
-    } catch { /* keep fallback */ }
+      } catch { /* fall through to auto-generate */ }
+    }
+
+    // 2. Auto-generate with Pollinations.ai (deterministic seed from title)
+    if (!image_url) {
+      try {
+        const searchTerm = recipe.image_search || recipe.title || 'food'
+        const seed = Math.abs(Array.from(searchTerm).reduce((h,c) => (h * 31 + c.charCodeAt(0)) | 0, 0))
+        const prompt = encodeURIComponent(`${searchTerm}, appetizing food photography, natural lighting, top view, professional`)
+        image_url = `https://image.pollinations.ai/prompt/${prompt}?seed=${seed}&nologo=true&model=flux-schnell&width=800&height=600`
+      } catch { /* keep null */ }
+    }
+
+    // 3. Try TheMealDB as supplement (real photography, better quality)
+    // Skip if we already have an image; but note: TheMealDB is checked first if no user upload
+    if (!recipeImageFile) {
+      try {
+        const searchTerm = recipe.image_search || ''
+        if (searchTerm) {
+          const res  = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(searchTerm)}`)
+          const json = await res.json()
+          if (json.meals?.[0]?.strMealThumb) {
+            image_url = json.meals[0].strMealThumb
+          }
+        }
+      } catch { /* keep Pollinations url */ }
+    }
 
     const { data, error } = await supabase.from('recipes').insert({
       user_id:      user.id,
@@ -309,11 +341,52 @@ export default function AddRecipe() {
           <div className="divider" />
 
           <div>
-            <div className="section-title">תמונה</div>
-            <div className="photo-upload">
-              <IconCamera size={28} color="var(--text-muted)" />
-              <p>בא לכם להשוויץ במנה שבישלתם?<br/>צלמו ושתפו תמונה של המנה שלכם<br/><span style={{color:'var(--text-muted)',fontSize:'.75rem'}}>(לא חובה, המערכת יכולה גם לייצר תמונה משלה)</span></p>
-            </div>
+            <div className="section-title">תמונה למתכון</div>
+
+            {/* Preview: user photo OR Pollinations preview */}
+            {recipeImagePreview ? (
+              <div className="recipe-img-preview" style={{ backgroundImage: `url(${recipeImagePreview})` }}>
+                <button
+                  className="recipe-img-change"
+                  onClick={() => recipeImgRef.current?.click()}
+                  type="button"
+                >
+                  <IconCamera size={16} /> החלף תמונה
+                </button>
+              </div>
+            ) : (
+              <div style={{ position: 'relative' }}>
+                {recipe?.image_search && (
+                  <img
+                    src={`https://image.pollinations.ai/prompt/${encodeURIComponent((recipe.image_search || recipe.title) + ', appetizing food photography, natural lighting')}?seed=${Math.abs(Array.from((recipe.image_search||'food')).reduce((h,c)=>(h*31+c.charCodeAt(0))|0,0))}&nologo=true&model=flux-schnell&width=800&height=400`}
+                    alt="תמונה שנוצרה אוטומטית"
+                    style={{ width:'100%', borderRadius:12, objectFit:'cover', aspectRatio:'2/1', display:'block' }}
+                    onError={e => { e.target.style.display='none' }}
+                  />
+                )}
+                <button
+                  className="btn btn-ghost btn-sm"
+                  style={{ marginTop: 8, width:'100%' }}
+                  onClick={() => recipeImgRef.current?.click()}
+                  type="button"
+                >
+                  <IconCamera size={16} /> העלו תמונה משלכם
+                </button>
+              </div>
+            )}
+
+            <input
+              ref={recipeImgRef}
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={e => {
+                const file = e.target.files[0]
+                if (!file) return
+                setRecipeImageFile(file)
+                setRecipeImagePreview(URL.createObjectURL(file))
+              }}
+            />
           </div>
 
           <div className="divider" />

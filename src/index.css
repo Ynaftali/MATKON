@@ -508,6 +508,10 @@ p  { line-height: 1.6; }
 .shopping-item.checked .shopping-check { background: var(--green); color: #080d1c; border-color: var(--green); }
 .shopping-name { font-size: .95rem; }
 
+/* Recipe image preview in AddRecipe step 3 */
+.recipe-img-preview { width:100%; aspect-ratio:2/1; border-radius:12px; background-size:cover; background-position:center; position:relative; overflow:hidden; }
+.recipe-img-change  { position:absolute; bottom:8px; right:8px; display:flex; align-items:center; gap:6px; background:rgba(0,0,0,.6); color:#fff; border:none; border-radius:8px; padding:6px 12px; font-size:.8rem; cursor:pointer; }
+
 /* Source credit */
 .source-credit { display: inline-flex; align-items: center; gap: 5px; font-size: .8rem; color: var(--blue-light); text-decoration: none; margin-bottom: 12px; }
 .source-credit:hover { text-decoration: underline; }

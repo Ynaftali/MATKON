@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   IconChevronRight, IconShare, IconClock, IconUsers, IconStar,
@@ -31,8 +31,11 @@ export default function RecipePage() {
   const [liked, setLiked]           = useState(false)
   const [likeLoading, setLikeLoading] = useState(false)
   const [toast, setToast]           = useState('')
-  const [shoppingOpen, setShoppingOpen] = useState(false)
-  const [shoppingDone, setShoppingDone] = useState({})
+  const [shoppingOpen, setShoppingOpen]   = useState(false)
+  const [shoppingDone, setShoppingDone]   = useState({})
+  const [shoppingEnriched, setShoppingEnriched] = useState(null)
+  const [shoppingLoading, setShoppingLoading]   = useState(false)
+  const imgEditRef = useRef()
   const [comments, setComments]     = useState([])
   const [newComment, setNewComment] = useState('')
   const [sending, setSending]       = useState(false)
@@ -148,9 +151,40 @@ export default function RecipePage() {
     }
   }
 
-  function openShopping() {
+  async function openShopping() {
     setShoppingDone({})
+    setShoppingEnriched(null)
     setShoppingOpen(true)
+    // Translate ingredients to user's local language
+    const country = profile?.country || currentUser?.user_metadata?.country
+    if (country && recipe?.ingredients?.length) {
+      setShoppingLoading(true)
+      try {
+        const res = await fetch('/api/translate-ingredients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ingredients: recipe.ingredients, country }),
+        })
+        if (res.ok) {
+          const { enriched } = await res.json()
+          setShoppingEnriched(enriched)
+        }
+      } catch {}
+      setShoppingLoading(false)
+    }
+  }
+
+  async function handleImageReplace(e) {
+    const file = e.target.files[0]
+    if (!file || !currentUser) return
+    const ext  = file.name.split('.').pop().toLowerCase() || 'jpg'
+    const path = `${currentUser.id}/${recipe.id}.${ext}`
+    const { data, error } = await supabase.storage.from('recipe-images').upload(path, file, { upsert: true })
+    if (error) { showToast('שגיאה בהעלאת התמונה'); return }
+    const { data: { publicUrl } } = supabase.storage.from('recipe-images').getPublicUrl(path)
+    await supabase.from('recipes').update({ image_url: publicUrl }).eq('id', recipe.id)
+    setRecipe(r => ({ ...r, image_url: publicUrl }))
+    showToast('התמונה עודכנה ✓')
   }
 
   function fmtQty(qty) {
@@ -240,15 +274,23 @@ export default function RecipePage() {
         </div>
 
         {recipe.source_url && (
-          <a
-            href={recipe.source_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="source-credit"
-          >
-            <IconExternalLink size={14} />
-            מקור המתכון
+          <a href={recipe.source_url} target="_blank" rel="noopener noreferrer" className="source-credit">
+            <IconExternalLink size={14} /> מקור המתכון
           </a>
+        )}
+
+        {/* image replace button for recipe owner */}
+        {currentUser && recipe.user_id === currentUser.id && (
+          <>
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ width:'auto', marginBottom:12 }}
+              onClick={() => imgEditRef.current?.click()}
+            >
+              <IconCheck size={14} /> החלף תמונה
+            </button>
+            <input ref={imgEditRef} type="file" accept="image/*" style={{ display:'none' }} onChange={handleImageReplace} />
+          </>
         )}
 
         {/* Ingredients */}
@@ -393,21 +435,32 @@ export default function RecipePage() {
               <button className="btn-icon" onClick={() => setShoppingOpen(false)}>✕</button>
             </div>
             <div className="drawer-body">
+              {shoppingLoading && (
+                <p style={{ textAlign:'center', color:'var(--text-muted)', padding:'12px 0', fontSize:'.85rem' }}>
+                  מתרגם לשפת המקום...
+                </p>
+              )}
               {recipe.ingredients?.map((ing, idx) => {
-                const name = ing.name_he || ing.name || ''
-                const qty  = ing.quantity || ing.amount || ''
-                const unit = ing.unit || ''
-                const key  = `${idx}`
+                const name      = ing.name_he || ing.name || ''
+                const qty       = ing.quantity || ing.amount || ''
+                const unit      = ing.unit || ''
+                const key       = `${idx}`
+                const enriched  = shoppingEnriched?.find(e => e.index === idx)
+                const localName = enriched?.name_local
+                const whereBuy  = enriched?.where_to_buy
                 return (
                   <label key={key} className={`shopping-item ${shoppingDone[key] ? 'checked' : ''}`}>
-                    <input
-                      type="checkbox"
-                      checked={!!shoppingDone[key]}
-                      onChange={() => setShoppingDone(d => ({ ...d, [key]: !d[key] }))}
-                      style={{ display: 'none' }}
-                    />
+                    <input type="checkbox" checked={!!shoppingDone[key]} onChange={() => setShoppingDone(d => ({ ...d, [key]: !d[key] }))} style={{ display:'none' }} />
                     <div className="shopping-check">{shoppingDone[key] ? <IconCheck size={14} /> : ''}</div>
-                    <span className="shopping-name">{qty} {unit} {name}</span>
+                    <div style={{ flex:1 }}>
+                      <div className="shopping-name">{qty} {unit} {name}</div>
+                      {localName && localName !== name && (
+                        <div style={{ fontSize:'.78rem', color:'var(--text-muted)', marginTop:1 }}>{localName}</div>
+                      )}
+                      {whereBuy && (
+                        <div style={{ fontSize:'.75rem', color:'var(--blue-light)', marginTop:3 }}>📍 {whereBuy}</div>
+                      )}
+                    </div>
                   </label>
                 )
               })}
