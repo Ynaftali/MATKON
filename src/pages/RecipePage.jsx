@@ -212,21 +212,37 @@ export default function RecipePage() {
     <div className="rpage">
       {/* Hero */}
       <div className="rpage-hero" style={{ background: gradient }}>
-        {recipe.image_url && (
-          <img
-            src={recipe.image_url}
-            alt={recipe.title}
-            className="rpage-hero-bg"
-            onError={e => { e.target.style.display = 'none' }}
-          />
-        )}
+        {(() => {
+          const seed   = Math.abs(Array.from(recipe.title||'food').reduce((h,c)=>(h*31+c.charCodeAt(0))|0,0))
+          const prompt = encodeURIComponent(`${recipe.title||'Israeli food'}, Mediterranean dish, food photography, natural lighting`)
+          const aiUrl  = `https://image.pollinations.ai/prompt/${prompt}?seed=${seed}&nologo=true&model=flux-schnell&width=800&height=600`
+          const imgSrc = recipe.image_url || aiUrl
+
+          async function saveAiImage(url) {
+            if (recipe.image_url || !recipe.id) return
+            try {
+              const { error } = await supabase.from('recipes').update({ image_url: url }).eq('id', recipe.id)
+              if (!error) setRecipe(r => ({ ...r, image_url: url }))
+            } catch {}
+          }
+
+          return (
+            <img
+              src={imgSrc}
+              alt={recipe.title}
+              className="rpage-hero-bg"
+              style={{ opacity: recipe.image_url ? 1 : 0, transition: 'opacity 0.7s' }}
+              onLoad={e => { e.target.style.opacity = 1; if (!recipe.image_url) saveAiImage(imgSrc) }}
+              onError={e => { e.target.style.display = 'none' }}
+            />
+          )
+        })()}
         {!recipe.image_url && currentUser?.id === recipe.user_id && (
           <div
-            style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8, color:'rgba(255,255,255,0.45)', cursor:'pointer' }}
-            onClick={() => imgEditRef.current?.click()}
+            style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8, color:'rgba(255,255,255,0.4)', cursor:'pointer', pointerEvents:'none' }}
           >
-            <IconCamera size={36} />
-            <span style={{ fontSize:'.85rem' }}>הוסיפו תמונה למתכון</span>
+            <IconCamera size={28} />
+            <span style={{ fontSize:'.78rem' }}>מייצר תמונה...</span>
           </div>
         )}
         <div className="rpage-hero-overlay" />
