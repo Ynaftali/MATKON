@@ -5,7 +5,7 @@ import {
   IconMessageCircle, IconShoppingCart, IconAlertTriangle, IconExternalLink,
   IconHeart, IconSend, IconCheck
 } from '@tabler/icons-react'
-import { mockRecipes, CATEGORY_GRADIENTS } from '../lib/mock'
+import { mockRecipes, CATEGORY_GRADIENTS, countryFlag } from '../lib/mock'
 import { supabase } from '../lib/supabase'
 import { compressImage } from '../lib/compressImage'
 import { useAuth } from '../lib/AuthContext'
@@ -57,7 +57,7 @@ export default function RecipePage() {
     // Try Supabase first
     const { data, error } = await supabase
       .from('recipes')
-      .select('*')
+      .select('*, users(full_name, country, city, bio)')
       .eq('id', id)
       .single()
     console.log('[RecipePage] id=', id, 'data=', data, 'error=', error)
@@ -251,8 +251,8 @@ export default function RecipePage() {
             {(user.full_name || 'א')[0]}
           </div>
           <div className="rpage-author-info">
-            <div className="rpage-author-name">🇮🇱 {user.country_flag} {user.full_name}</div>
-            <div className="rpage-author-loc">{user.city}, {user.country}</div>
+            <div className="rpage-author-name">🇮🇱 {countryFlag(user.country)} {user.full_name}</div>
+            <div className="rpage-author-loc">{[user.city, user.country].filter(Boolean).join(', ')}</div>
           </div>
         </div>
 
