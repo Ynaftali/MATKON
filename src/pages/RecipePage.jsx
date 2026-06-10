@@ -220,6 +220,15 @@ export default function RecipePage() {
             onError={e => { e.target.style.display = 'none' }}
           />
         )}
+        {!recipe.image_url && currentUser?.id === recipe.user_id && (
+          <div
+            style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8, color:'rgba(255,255,255,0.45)', cursor:'pointer' }}
+            onClick={() => imgEditRef.current?.click()}
+          >
+            <IconCamera size={36} />
+            <span style={{ fontSize:'.85rem' }}>הוסיפו תמונה למתכון</span>
+          </div>
+        )}
         <div className="rpage-hero-overlay" />
         <div className="rpage-hero-top">
           <button className="btn-icon" onClick={() => navigate(-1)}>
@@ -247,26 +256,27 @@ export default function RecipePage() {
       </div>
 
       <div className="rpage-body">
-        {/* Title & author */}
-        <div className="rpage-title">{recipe.title}</div>
-
-        <div className="rpage-author" style={{ justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <div className="avatar avatar-md">
-              {(user.full_name || 'א')[0]}
-            </div>
-            <div className="rpage-author-info">
-              <div className="rpage-author-name">🇮🇱 {countryFlag(user.country)} {user.full_name}</div>
-              <div className="rpage-author-loc">{[user.city, user.country].filter(Boolean).join(', ')}</div>
-            </div>
-          </div>
+        {/* Title + cook button */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
+          <div className="rpage-title" style={{ marginBottom: 0 }}>{recipe.title}</div>
           <button
             className="btn btn-primary"
-            style={{ padding: '8px 16px', fontSize: '.85rem', whiteSpace: 'nowrap', flexShrink: 0 }}
+            style={{ width: 'auto', padding: '10px 16px', fontSize: '.85rem', flexShrink: 0, borderRadius: 24, marginTop: 4 }}
             onClick={() => navigate(`/cook/${recipe.id}`, { state: { recipe } })}
           >
             🍳 בישול
           </button>
+        </div>
+
+        {/* Author */}
+        <div className="rpage-author">
+          <div className="avatar avatar-md">
+            {(user.full_name || 'א')[0]}
+          </div>
+          <div className="rpage-author-info">
+            <div className="rpage-author-name">🇮🇱 {countryFlag(user.country)} {user.full_name}</div>
+            <div className="rpage-author-loc">{[user.city, user.country].filter(Boolean).join(', ')}</div>
+          </div>
         </div>
 
         {/* Stats */}
