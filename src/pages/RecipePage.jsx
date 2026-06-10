@@ -8,6 +8,7 @@ import {
 import { mockRecipes, CATEGORY_GRADIENTS, countryFlag } from '../lib/mock'
 import { supabase } from '../lib/supabase'
 import { compressImage } from '../lib/compressImage'
+import { addIngredientsToList } from '../lib/shopping'
 import { useAuth } from '../lib/AuthContext'
 import BottomNav from '../components/BottomNav'
 
@@ -420,8 +421,11 @@ export default function RecipePage() {
           )}
         </div>
 
-        <button className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={openShopping}>
-          <IconShoppingCart size={18} /> רשימת קניות
+        <button className="btn btn-ghost" style={{ marginBottom: 12 }} onClick={() => {
+          addIngredientsToList(recipe.ingredients || [], recipe.title)
+          openShopping()
+        }}>
+          <IconShoppingCart size={18} /> הוסף לרשימת קניות
         </button>
         <button className="btn btn-primary" onClick={() => navigate(`/cook/${recipe.id}`)}>
           🍳 התחילו לבשל

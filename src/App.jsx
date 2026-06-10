@@ -30,6 +30,7 @@ import Community       from './pages/Community'
 import Recipes         from './pages/Recipes'
 import VerifyEmail     from './pages/VerifyEmail'
 import Terms          from './pages/Terms'
+import Shopping       from './pages/Shopping'
 
 export default function App() {
   return (
@@ -53,6 +54,7 @@ export default function App() {
         <Route path="/verify-email"        element={<VerifyEmail />}  />
         <Route path="/auth/callback"       element={<AuthCallback />} />
         <Route path="/terms"               element={<Terms />}        />
+        <Route path="/shopping"            element={<Shopping />}     />
         <Route path="*"                    element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>
