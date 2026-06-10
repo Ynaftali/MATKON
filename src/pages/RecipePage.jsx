@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   IconChevronRight, IconShare, IconClock, IconUsers, IconStar,
   IconMessageCircle, IconShoppingCart, IconAlertTriangle, IconExternalLink,
-  IconHeart, IconSend, IconCheck
+  IconHeart, IconSend, IconCheck, IconCamera
 } from '@tabler/icons-react'
 import { mockRecipes, CATEGORY_GRADIENTS, countryFlag } from '../lib/mock'
 import { supabase } from '../lib/supabase'
@@ -211,8 +211,7 @@ export default function RecipePage() {
   return (
     <div className="rpage">
       {/* Hero */}
-      <div className="rpage-hero">
-        <div className="rpage-hero-gradient" style={{ background: gradient }} />
+      <div className="rpage-hero" style={{ background: gradient }}>
         {(() => {
           const term   = recipe.title || 'food'
           const seed   = Math.abs(Array.from(term).reduce((h,c) => (h*31+c.charCodeAt(0))|0, 0))
@@ -223,7 +222,7 @@ export default function RecipePage() {
               src={imgSrc}
               alt={recipe.title}
               className="rpage-hero-bg"
-              style={{ opacity: 0, transition: 'opacity 0.5s' }}
+              style={{ opacity: recipe.image_url ? 1 : 0, transition: 'opacity 0.6s' }}
               onLoad={e => { e.target.style.opacity = 1 }}
               onError={e => { e.target.style.display = 'none' }}
             />
@@ -235,6 +234,11 @@ export default function RecipePage() {
             <IconChevronRight size={20} />
           </button>
           <div style={{ display: 'flex', gap: 8 }}>
+            {currentUser && recipe.user_id === currentUser.id && (
+              <button className="btn-icon hero-camera-btn" onClick={() => imgEditRef.current?.click()} aria-label="החלף תמונה" title="החלף תמונה">
+                <IconCamera size={18} />
+              </button>
+            )}
             <button
               className={`btn-icon like-btn${liked ? ' liked' : ''}`}
               onClick={toggleLike}
@@ -294,19 +298,7 @@ export default function RecipePage() {
           </a>
         )}
 
-        {/* image replace button for recipe owner */}
-        {currentUser && recipe.user_id === currentUser.id && (
-          <>
-            <button
-              className="btn btn-ghost btn-sm"
-              style={{ width:'auto', marginBottom:12 }}
-              onClick={() => imgEditRef.current?.click()}
-            >
-              <IconCheck size={14} /> החלף תמונה
-            </button>
-            <input ref={imgEditRef} type="file" accept="image/*" style={{ display:'none' }} onChange={handleImageReplace} />
-          </>
-        )}
+        <input ref={imgEditRef} type="file" accept="image/*" style={{ display:'none' }} onChange={handleImageReplace} />
 
         {/* Ingredients */}
         <div className="rpage-section">

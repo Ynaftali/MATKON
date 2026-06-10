@@ -5,7 +5,28 @@ import { supabase } from '../lib/supabase'
 import { mockRecipes } from '../lib/mock'
 
 function parseHebrewDuration(text) {
-  const m = text.match(/(\d+(?:\.\d+)?)\s*(שעות?|דקות?|שניות?)/)
+  if (!text) return null
+  // Dual forms (no digit)
+  if (/שעתיים/.test(text)) return 7200
+  if (/דקתיים/.test(text)) return 120
+  // "חצי שעה" = 30 min
+  if (/חצי\s*שעה/.test(text)) return 1800
+  // "רבע שעה" = 15 min, "שלוש רבעי שעה" = 45 min
+  if (/שלוש\s*רבעי\s*שעה/.test(text)) return 2700
+  if (/רבע\s*שעה/.test(text)) return 900
+  // Written Hebrew numbers + unit
+  const hebrewNums = {
+    'אחת': 1, 'אחד': 1, 'שתי': 2, 'שתיים': 2, 'שלוש': 3, 'ארבע': 4,
+    'חמש': 5, 'שש': 6, 'שבע': 7, 'שמונה': 8, 'תשע': 9, 'עשר': 10,
+    'אחת עשרה': 11, 'שתים עשרה': 12, 'חמש עשרה': 15, 'עשרים': 20, 'שלושים': 30,
+    'ארבעים': 40, 'חמישים': 50,
+  }
+  for (const [word, val] of Object.entries(hebrewNums)) {
+    if (new RegExp(word + '\\s+(?:שעות|שעה)').test(text)) return val * 3600
+    if (new RegExp(word + '\\s+(?:דקות|דקה)').test(text)) return val * 60
+  }
+  // Digit + unit (must come after written-number check)
+  const m = text.match(/(\d+(?:\.\d+)?)\s*(שעות?|שעה|דקות?|דקה|שניות?|שנייה)/)
   if (!m) return null
   const n = parseFloat(m[1])
   if (m[2].startsWith('שעה') || m[2].startsWith('שעות')) return Math.round(n * 3600)
@@ -14,8 +35,10 @@ function parseHebrewDuration(text) {
 }
 
 function fmtCountdown(s) {
-  const m = Math.floor(s / 60)
+  const h   = Math.floor(s / 3600)
+  const m   = Math.floor((s % 3600) / 60)
   const sec = s % 60
+  if (h > 0) return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
   return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
 }
 
@@ -63,9 +86,10 @@ export default function CookingMode() {
   const { id }    = useParams()
   const navigate  = useNavigate()
 
-  const [recipe, setRecipe]   = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [done, setDone]       = useState(new Set())
+  const [recipe, setRecipe]       = useState(null)
+  const [loading, setLoading]     = useState(true)
+  const [done, setDone]           = useState(new Set())
+  const [activeStep, setActiveStep] = useState(0)
 
   useEffect(() => {
     async function load() {
@@ -83,13 +107,23 @@ export default function CookingMode() {
   )
   if (!recipe) return null
 
-  const steps    = recipe.steps || []
-  const allDone  = steps.length > 0 && done.size >= steps.length
+  const steps   = recipe.steps || []
+  const allDone = steps.length > 0 && done.size >= steps.length
 
-  function toggleStep(i) {
+  function toggleDone(i, e) {
+    e.stopPropagation()
     setDone(prev => {
       const next = new Set(prev)
-      if (next.has(i)) next.delete(i); else next.add(i)
+      if (next.has(i)) {
+        next.delete(i)
+      } else {
+        next.add(i)
+        // Move active to next undone step
+        if (i === activeStep) {
+          const nextUndone = steps.findIndex((_, idx) => idx > i && !next.has(idx))
+          if (nextUndone !== -1) setActiveStep(nextUndone)
+        }
+      }
       return next
     })
   }
@@ -122,23 +156,31 @@ export default function CookingMode() {
 
       <div className="cook-steps">
         {steps.map((step, i) => {
-          const isDone = done.has(i)
-          const num    = step.step_number || step.order || i + 1
-          const text   = step.description || step.text || ''
-          const dur    = step.duration_seconds || parseHebrewDuration(text) || null
+          const isDone  = done.has(i)
+          const num     = step.step_number || step.order || i + 1
+          const text    = step.description || step.text || ''
+          const dur     = step.duration_seconds || parseHebrewDuration(text) || null
+          const isCur   = i === activeStep && !isDone
+          const isNext  = !isDone && !isCur && i > activeStep
+          const cls     = isDone ? 'done' : isCur ? 'current' : isNext ? 'next' : ''
           return (
-            <div key={i} className={`cook-step ${isDone ? 'done' : ''}`}>
+            <div
+              key={i}
+              className={`cook-step ${cls}`}
+              onClick={() => !isDone && setActiveStep(i)}
+              style={{ cursor: isDone ? 'default' : 'pointer' }}
+            >
               <div className="cook-step-header">
                 <span className="cook-step-num">שלב {num}</span>
                 <div
                   className={`cook-checkbox ${isDone ? 'checked' : ''}`}
-                  onClick={() => toggleStep(i)}
+                  onClick={e => toggleDone(i, e)}
                 >
                   {isDone && <IconCheck size={14} strokeWidth={3} />}
                 </div>
               </div>
               <div className="cook-step-text">{text}</div>
-              {dur && !isDone && <StepTimer key={i} durationSeconds={dur} />}
+              {dur && <StepTimer key={`timer-${i}`} durationSeconds={dur} />}
             </div>
           )
         })}
