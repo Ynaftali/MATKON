@@ -7,6 +7,7 @@ import {
 } from '@tabler/icons-react'
 import { mockRecipes, CATEGORY_GRADIENTS } from '../lib/mock'
 import { supabase } from '../lib/supabase'
+import { compressImage } from '../lib/compressImage'
 import { useAuth } from '../lib/AuthContext'
 import BottomNav from '../components/BottomNav'
 
@@ -177,9 +178,9 @@ export default function RecipePage() {
   async function handleImageReplace(e) {
     const file = e.target.files[0]
     if (!file || !currentUser) return
-    const ext  = file.name.split('.').pop().toLowerCase() || 'jpg'
-    const path = `${currentUser.id}/${recipe.id}.${ext}`
-    const { data, error } = await supabase.storage.from('recipe-images').upload(path, file, { upsert: true })
+    const compressed = await compressImage(file)
+    const path = `${currentUser.id}/${recipe.id}.jpg`
+    const { data, error } = await supabase.storage.from('recipe-images').upload(path, compressed, { contentType: 'image/jpeg', upsert: true })
     if (error) { showToast('שגיאה בהעלאת התמונה'); return }
     const { data: { publicUrl } } = supabase.storage.from('recipe-images').getPublicUrl(path)
     await supabase.from('recipes').update({ image_url: publicUrl }).eq('id', recipe.id)
@@ -453,10 +454,13 @@ export default function RecipePage() {
                     <input type="checkbox" checked={!!shoppingDone[key]} onChange={() => setShoppingDone(d => ({ ...d, [key]: !d[key] }))} style={{ display:'none' }} />
                     <div className="shopping-check">{shoppingDone[key] ? <IconCheck size={14} /> : ''}</div>
                     <div style={{ flex:1 }}>
-                      <div className="shopping-name">{qty} {unit} {name}</div>
-                      {localName && localName !== name && (
-                        <div style={{ fontSize:'.78rem', color:'var(--text-muted)', marginTop:1 }}>{localName}</div>
-                      )}
+                      <div className="shopping-name">
+                        <span>{qty} {unit} </span>
+                        <span>{name}</span>
+                        {localName && localName !== name && (
+                          <span style={{ color:'var(--text-muted)', fontWeight:400 }}> · {localName}</span>
+                        )}
+                      </div>
                       {whereBuy && (
                         <div style={{ fontSize:'.75rem', color:'var(--blue-light)', marginTop:3 }}>📍 {whereBuy}</div>
                       )}

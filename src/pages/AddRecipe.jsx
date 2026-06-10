@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import { IconChevronRight, IconFlame, IconPencil, IconLink, IconCamera, IconPlus, IconX, IconLock, IconWorld, IconBrandWhatsapp, IconBrandInstagram, IconBrandFacebook, IconCopy } from '@tabler/icons-react'
+import { compressImage } from '../lib/compressImage'
 
 const AI_STEPS = [
   { icon: '🥕', label: 'זיהוי מצרכים' },
@@ -115,14 +116,14 @@ export default function AddRecipe() {
     }
     let image_url = null
 
-    // 1. User uploaded their own photo → upload to Supabase Storage
+    // 1. User uploaded their own photo → compress + upload to Supabase Storage
     if (recipeImageFile) {
       try {
-        const ext  = recipeImageFile.name.split('.').pop().toLowerCase() || 'jpg'
-        const path = `${user.id}/${Date.now()}.${ext}`
+        const compressed = await compressImage(recipeImageFile)
+        const path = `${user.id}/${Date.now()}.jpg`
         const { data: upData, error: upErr } = await supabase.storage
           .from('recipe-images')
-          .upload(path, recipeImageFile, { contentType: recipeImageFile.type, upsert: false })
+          .upload(path, compressed, { contentType: 'image/jpeg', upsert: false })
         if (!upErr && upData) {
           const { data: { publicUrl } } = supabase.storage.from('recipe-images').getPublicUrl(path)
           image_url = publicUrl
