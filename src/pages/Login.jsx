@@ -25,11 +25,9 @@ export default function Login() {
 
   return (
     <div className="auth-page">
-      <div className="topbar" style={{ position: 'static', padding: '0 0 16px' }}>
-        <button className="btn-icon" onClick={() => navigate(-1)}>
-          <IconChevronRight size={20} />
-        </button>
-      </div>
+      <button className="btn-icon" style={{ marginBottom: 8 }} onClick={() => navigate(-1)}>
+        <IconChevronRight size={20} />
+      </button>
 
       <div style={{ textAlign: 'center', marginBottom: 8 }}>
         <img src="/logofullNObackground.png" alt="matkon" style={{ width: '55%', maxWidth: 200 }} />

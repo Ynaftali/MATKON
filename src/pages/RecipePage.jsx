@@ -276,11 +276,11 @@ export default function RecipePage() {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
           <div className="rpage-title" style={{ marginBottom: 0 }}>{recipe.title}</div>
           <button
-            className="btn btn-primary"
-            style={{ width: 'auto', padding: '10px 16px', fontSize: '.85rem', flexShrink: 0, borderRadius: 24, marginTop: 4 }}
+            className="btn btn-green"
+            style={{ width: 'auto', padding: '10px 20px', fontSize: '.9rem', flexShrink: 0, borderRadius: 24, marginTop: 4 }}
             onClick={() => navigate(`/cook/${recipe.id}`, { state: { recipe } })}
           >
-            🍳 בישול
+            התחילו לבשל
           </button>
         </div>
 
