@@ -4,6 +4,15 @@ import { IconChevronRight, IconPlayerPlay, IconPlayerPause, IconRotate, IconChec
 import { supabase } from '../lib/supabase'
 import { mockRecipes } from '../lib/mock'
 
+function parseHebrewDuration(text) {
+  const m = text.match(/(\d+(?:\.\d+)?)\s*(שעות?|דקות?|שניות?)/)
+  if (!m) return null
+  const n = parseFloat(m[1])
+  if (m[2].startsWith('שעה') || m[2].startsWith('שעות')) return Math.round(n * 3600)
+  if (m[2].startsWith('דקה') || m[2].startsWith('דקות')) return Math.round(n * 60)
+  return Math.round(n)
+}
+
 function fmtCountdown(s) {
   const m = Math.floor(s / 60)
   const sec = s % 60
@@ -116,7 +125,7 @@ export default function CookingMode() {
           const isDone = done.has(i)
           const num    = step.step_number || step.order || i + 1
           const text   = step.description || step.text || ''
-          const dur    = step.duration_seconds || null
+          const dur    = step.duration_seconds || parseHebrewDuration(text) || null
           return (
             <div key={i} className={`cook-step ${isDone ? 'done' : ''}`}>
               <div className="cook-step-header">

@@ -31,6 +31,10 @@ export default function Login() {
         </button>
       </div>
 
+      <div style={{ textAlign: 'center', marginBottom: 8 }}>
+        <img src="/logofullNObackground.png" alt="matkon" style={{ width: '55%', maxWidth: 200 }} />
+      </div>
+
       <div className="auth-header">
         <h1>שלום שוב 👋</h1>
         <p>כניסה לחשבון הקיים שלכם</p>

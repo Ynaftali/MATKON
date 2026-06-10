@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IconHeart, IconMessageCircle, IconBookmark } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
-import { mockRecipes, CATEGORY_GRADIENTS } from '../lib/mock'
+import { mockRecipes, CATEGORY_GRADIENTS, countryFlag } from '../lib/mock'
 import { useAuth } from '../lib/AuthContext'
 import BottomNav from '../components/BottomNav'
 
@@ -26,7 +26,7 @@ function RecipeCard({ recipe, onClick }) {
         <div className="rcard-title">{recipe.title}</div>
         <div className="rcard-meta">
           <div className="rcard-author">
-            <span>{recipe.users?.country_flag || '🇮🇱'}</span>
+            <span>{countryFlag(recipe.users?.country) || '🇮🇱'}</span>
             <span>{recipe.users?.full_name || 'אנונימי'}</span>
           </div>
           <div className="rcard-stats">
@@ -71,7 +71,7 @@ export default function Recipes() {
     setLoading(true)
     const { data } = await supabase
       .from('recipes')
-      .select('*')
+      .select('*, users(full_name, country, city)')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
     setMyRecipes(data || [])
@@ -87,7 +87,7 @@ export default function Recipes() {
     const ids = likeRows.map(l => l.recipe_id)
     const { data } = await supabase
       .from('recipes')
-      .select('*')
+      .select('*, users(full_name, country, city)')
       .in('id', ids)
       .order('created_at', { ascending: false })
     setLiked(data || [])

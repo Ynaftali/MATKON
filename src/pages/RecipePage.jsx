@@ -101,7 +101,7 @@ export default function RecipePage() {
     try {
       const { data } = await supabase
         .from('recipe_comments')
-        .select('id, content, created_at, users(full_name, country_flag, country)')
+        .select('id, content, created_at, users(full_name, country)')
         .eq('recipe_id', recipeId || id)
         .order('created_at', { ascending: true })
       if (data) setComments(data)
@@ -117,7 +117,7 @@ export default function RecipePage() {
       const { data, error } = await supabase
         .from('recipe_comments')
         .insert({ recipe_id: id, user_id: currentUser.id, content: newComment.trim() })
-        .select('id, content, created_at, users(full_name, country_flag, country)')
+        .select('id, content, created_at, users(full_name, country)')
         .single()
       if (!error && data) {
         setComments(c => [...c, data])
@@ -212,16 +212,23 @@ export default function RecipePage() {
     <div className="rpage">
       {/* Hero */}
       <div className="rpage-hero">
+        <div className="rpage-hero-gradient" style={{ background: gradient }} />
         {(() => {
-          const imgSrc = recipe.image_url || (() => {
-            const term  = recipe.title || 'food'
-            const seed  = Math.abs(Array.from(term).reduce((h,c) => (h*31+c.charCodeAt(0))|0, 0))
-            const p     = encodeURIComponent(`${term}, appetizing food photography, natural lighting`)
-            return `https://image.pollinations.ai/prompt/${p}?seed=${seed}&nologo=true&model=flux-schnell&width=800&height=600`
-          })()
-          return <img src={imgSrc} alt={recipe.title} className="rpage-hero-bg" onError={e => { e.target.style.display='none'; e.target.nextSibling?.style.setProperty('display','block') }} />
+          const term   = recipe.title || 'food'
+          const seed   = Math.abs(Array.from(term).reduce((h,c) => (h*31+c.charCodeAt(0))|0, 0))
+          const p      = encodeURIComponent(`${term}, appetizing food photography, natural lighting`)
+          const imgSrc = recipe.image_url || `https://image.pollinations.ai/prompt/${p}?seed=${seed}&nologo=true&model=flux-schnell&width=800&height=600`
+          return (
+            <img
+              src={imgSrc}
+              alt={recipe.title}
+              className="rpage-hero-bg"
+              style={{ opacity: 0, transition: 'opacity 0.5s' }}
+              onLoad={e => { e.target.style.opacity = 1 }}
+              onError={e => { e.target.style.display = 'none' }}
+            />
+          )
         })()}
-        <div className="rpage-hero-gradient" style={{ background: gradient, display:'none' }} />
         <div className="rpage-hero-overlay" />
         <div className="rpage-hero-top">
           <button className="btn-icon" onClick={() => navigate(-1)}>
@@ -378,7 +385,7 @@ export default function RecipePage() {
                     <div className="avatar avatar-sm comment-avatar">{initials}</div>
                     <div className="comment-body">
                       <div className="comment-meta">
-                        <span className="comment-flags">🇮🇱 {cu.country_flag}</span>
+                        <span className="comment-flags">🇮🇱 {countryFlag(cu.country)}</span>
                         <span className="comment-name">{cu.full_name || 'משתמש'}</span>
                         <span className="comment-time">{timeAgo(c.created_at)}</span>
                       </div>

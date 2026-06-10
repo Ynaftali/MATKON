@@ -3,17 +3,54 @@ import { IconTrash, IconShare, IconCheck, IconShoppingCart } from '@tabler/icons
 import {
   getShoppingList, toggleShoppingItem, removeChecked, clearAll
 } from '../lib/shopping'
+import { useAuth } from '../lib/AuthContext'
 import BottomNav from '../components/BottomNav'
 
 export default function Shopping() {
-  const [items, setItems] = useState(getShoppingList)
+  const [items, setItems]           = useState(getShoppingList)
+  const [translations, setTrans]    = useState({}) // { itemName: { name_local, where_to_buy } }
+  const [translating, setTranslating] = useState(false)
+  const { profile } = useAuth()
 
   useEffect(() => {
-    // Sync if list changes in another tab
     const onStorage = () => setItems(getShoppingList())
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
   }, [])
+
+  // Translate unchecked items when page loads and country is known
+  useEffect(() => {
+    const country = profile?.country
+    const uncheckedItems = items.filter(i => !i.checked)
+    const needsTranslation = uncheckedItems.some(i => !i.name_local)
+    if (!country || !needsTranslation || uncheckedItems.length === 0) return
+
+    async function doTranslate() {
+      setTranslating(true)
+      try {
+        const res = await fetch('/api/translate-ingredients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ingredients: uncheckedItems.map(i => ({ name: i.name, amount: i.qty, unit: i.unit })),
+            country,
+          }),
+        })
+        if (res.ok) {
+          const { enriched } = await res.json()
+          const map = {}
+          enriched?.forEach(e => {
+            const item = uncheckedItems[e.index]
+            if (item) map[item.id] = { name_local: e.name_local, where_to_buy: e.where_to_buy }
+          })
+          setTrans(map)
+        }
+      } finally {
+        setTranslating(false)
+      }
+    }
+    doTranslate()
+  }, [profile?.country]) // run once when country is known
 
   const unchecked = items.filter(i => !i.checked)
   const checked   = items.filter(i => i.checked)
@@ -24,9 +61,10 @@ export default function Shopping() {
 
   function shareList() {
     const lines = unchecked.map(i => {
-      const q    = i.qty > 0 ? `${i.qty} ${i.unit} ` : ''
-      const loc  = i.name_local && i.name_local !== i.name ? ` (${i.name_local})` : ''
-      return `• ${q}${i.name}${loc}`
+      const q   = i.qty > 0 ? `${i.qty} ${i.unit} ` : ''
+      const loc = (translations[i.id]?.name_local || i.name_local)
+      const locStr = loc && loc !== i.name ? ` (${loc})` : ''
+      return `• ${q}${i.name}${locStr}`
     }).join('\n')
     const text = `רשימת קניות — matkon\n\n${lines}`
     if (navigator.share) {
@@ -41,7 +79,7 @@ export default function Shopping() {
       <div className="topbar">
         <div style={{ width: 40 }} />
         <span className="topbar-title">רשימת קניות</span>
-        <div style={{ display:'flex', gap:4 }}>
+        <div style={{ display: 'flex', gap: 4 }}>
           {unchecked.length > 0 && (
             <button className="btn-icon" onClick={shareList} title="שתף/ייצא">
               <IconShare size={20} />
@@ -55,28 +93,34 @@ export default function Shopping() {
         </div>
       </div>
 
-      <div className="page-scroll" style={{ padding:'0 16px 24px' }}>
+      <div className="page-scroll" style={{ padding: '0 16px 24px' }}>
         {items.length === 0 && (
-          <div style={{ textAlign:'center', padding:'80px 24px', color:'var(--text-muted)' }}>
-            <IconShoppingCart size={48} style={{ marginBottom:16, opacity:.3 }} />
+          <div style={{ textAlign: 'center', padding: '80px 24px', color: 'var(--text-muted)' }}>
+            <IconShoppingCart size={48} style={{ marginBottom: 16, opacity: .3 }} />
             <p>הרשימה ריקה</p>
-            <p style={{ fontSize:'.85rem', marginTop:8 }}>לחצו ״הוסף לרשימת קניות״ בכל מתכון</p>
+            <p style={{ fontSize: '.85rem', marginTop: 8 }}>לחצו ״הוסף לרשימת קניות״ בכל מתכון</p>
           </div>
+        )}
+
+        {translating && items.length > 0 && (
+          <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '.8rem', padding: '8px 0' }}>
+            מתרגם לשפת המקום...
+          </p>
         )}
 
         {unchecked.length > 0 && (
           <div style={{ marginBottom: 24 }}>
             {unchecked.map(item => (
-              <ShoppingRow key={item.id} item={item} onToggle={toggle} />
+              <ShoppingRow key={item.id} item={item} enriched={translations[item.id]} onToggle={toggle} />
             ))}
           </div>
         )}
 
         {checked.length > 0 && (
           <>
-            <div style={{ fontSize:'.8rem', color:'var(--text-muted)', marginBottom:8 }}>✓ נרכשו</div>
+            <div style={{ fontSize: '.8rem', color: 'var(--text-muted)', marginBottom: 8 }}>✓ נרכשו</div>
             {checked.map(item => (
-              <ShoppingRow key={item.id} item={item} onToggle={toggle} />
+              <ShoppingRow key={item.id} item={item} enriched={translations[item.id]} onToggle={toggle} />
             ))}
           </>
         )}
@@ -84,7 +128,7 @@ export default function Shopping() {
         {items.length > 0 && (
           <button
             className="btn btn-ghost btn-sm"
-            style={{ marginTop:16, color:'var(--red)', borderColor:'var(--red)' }}
+            style={{ marginTop: 16, color: 'var(--red)', borderColor: 'var(--red)' }}
             onClick={clear}
           >
             ניקוי הרשימה
@@ -97,25 +141,32 @@ export default function Shopping() {
   )
 }
 
-function ShoppingRow({ item, onToggle }) {
-  const qtyStr   = item.qty > 0 ? `${item.qty} ${item.unit} ` : ''
-  const localStr = item.name_local && item.name_local !== item.name ? ` · ${item.name_local}` : ''
+function ShoppingRow({ item, enriched, onToggle }) {
+  const qtyStr    = item.qty > 0 ? `${item.qty} ${item.unit} ` : ''
+  const localName = enriched?.name_local || item.name_local
+  const localStr  = localName && localName !== item.name ? ` · ${localName}` : ''
+  const whereBuy  = enriched?.where_to_buy
   return (
     <div
       className={`shopping-item ${item.checked ? 'checked' : ''}`}
       onClick={() => onToggle(item.id)}
-      style={{ cursor:'pointer' }}
+      style={{ cursor: 'pointer' }}
     >
       <div className="shopping-check">
         {item.checked ? <IconCheck size={14} /> : ''}
       </div>
-      <div style={{ flex:1 }}>
+      <div style={{ flex: 1 }}>
         <div className="shopping-name">
           {qtyStr}<strong>{item.name}</strong>
-          <span style={{ color:'var(--text-muted)', fontWeight:400 }}>{localStr}</span>
+          <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>{localStr}</span>
         </div>
+        {whereBuy && (
+          <div style={{ fontSize: '.72rem', color: 'var(--blue-light)', marginTop: 3 }}>
+            📍 {whereBuy}
+          </div>
+        )}
         {item.recipes?.length > 0 && (
-          <div style={{ fontSize:'.72rem', color:'var(--text-muted)', marginTop:2 }}>
+          <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
             {item.recipes.join(' · ')}
           </div>
         )}
