@@ -40,7 +40,7 @@ export default function RecipePage() {
   const [comments, setComments]     = useState([])
   const [newComment, setNewComment] = useState('')
   const [sending, setSending]       = useState(false)
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, profile } = useAuth()
   const commentsEndRef = useRef(null)
 
   function showToast(msg) {
@@ -211,10 +211,16 @@ export default function RecipePage() {
     <div className="rpage">
       {/* Hero */}
       <div className="rpage-hero">
-        {recipe.image_url
-          ? <img src={recipe.image_url} alt={recipe.title} className="rpage-hero-bg" />
-          : <div className="rpage-hero-gradient" style={{ background: gradient }} />
-        }
+        {(() => {
+          const imgSrc = recipe.image_url || (() => {
+            const term  = recipe.title || 'food'
+            const seed  = Math.abs(Array.from(term).reduce((h,c) => (h*31+c.charCodeAt(0))|0, 0))
+            const p     = encodeURIComponent(`${term}, appetizing food photography, natural lighting`)
+            return `https://image.pollinations.ai/prompt/${p}?seed=${seed}&nologo=true&model=flux-schnell&width=800&height=600`
+          })()
+          return <img src={imgSrc} alt={recipe.title} className="rpage-hero-bg" onError={e => { e.target.style.display='none'; e.target.nextSibling?.style.setProperty('display','block') }} />
+        })()}
+        <div className="rpage-hero-gradient" style={{ background: gradient, display:'none' }} />
         <div className="rpage-hero-overlay" />
         <div className="rpage-hero-top">
           <button className="btn-icon" onClick={() => navigate(-1)}>
