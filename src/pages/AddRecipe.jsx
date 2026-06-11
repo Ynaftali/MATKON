@@ -137,7 +137,7 @@ export default function AddRecipe() {
         const searchTerm = recipe.image_search || recipe.title || 'food'
         const seed = Math.abs(Array.from(searchTerm).reduce((h,c) => (h * 31 + c.charCodeAt(0)) | 0, 0))
         const prompt = encodeURIComponent(`${searchTerm}, appetizing food photography, natural lighting, top view, professional`)
-        image_url = `https://image.pollinations.ai/prompt/${prompt}?seed=${seed}&nologo=true&model=flux-schnell&width=800&height=600`
+        image_url = `https://image.pollinations.ai/prompt/${prompt}?seed=${seed}&nologo=true&width=800&height=600`
       } catch { /* keep null */ }
     }
 
@@ -359,7 +359,7 @@ export default function AddRecipe() {
               <div style={{ position: 'relative' }}>
                 {recipe?.image_search && (
                   <img
-                    src={`https://image.pollinations.ai/prompt/${encodeURIComponent((recipe.image_search || recipe.title) + ', appetizing food photography, natural lighting')}?seed=${Math.abs(Array.from((recipe.image_search||'food')).reduce((h,c)=>(h*31+c.charCodeAt(0))|0,0))}&nologo=true&model=flux-schnell&width=800&height=400`}
+                    src={`https://image.pollinations.ai/prompt/${encodeURIComponent((recipe.image_search || recipe.title) + ', appetizing food photography, natural lighting')}?seed=${Math.abs(Array.from((recipe.image_search||'food')).reduce((h,c)=>(h*31+c.charCodeAt(0))|0,0))}&nologo=true&width=800&height=400`}
                     alt="תמונה שנוצרה אוטומטית"
                     style={{ width:'100%', borderRadius:12, objectFit:'cover', aspectRatio:'2/1', display:'block' }}
                     onError={e => { e.target.style.display='none' }}
