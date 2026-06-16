@@ -17,7 +17,6 @@ function EditModal({ profile, onClose, onSave }) {
   const [form, setForm] = useState({
     full_name: profile?.full_name || '',
     country:   profile?.country   || '',
-    city:      profile?.city      || '',
     bio:       profile?.bio       || '',
   })
   const [saving, setSaving] = useState(false)
@@ -50,11 +49,6 @@ function EditModal({ profile, onClose, onSave }) {
               <option value="">בחרו מדינה</option>
               {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-          </div>
-
-          <div>
-            <label style={{ fontSize: '.85rem', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>עיר</label>
-            <input className="input" value={form.city} onChange={set('city')} placeholder="עיר מגורים (לא חובה)" />
           </div>
 
           <div>
@@ -102,7 +96,6 @@ export default function Profile() {
       .update({
         full_name: form.full_name,
         country:   form.country,
-        city:      form.city,
         bio:       form.bio,
       })
       .eq('id', user.id)
