@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IconHeart, IconMessageCircle, IconBookmark } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
-import { mockRecipes, CATEGORY_GRADIENTS, countryFlag } from '../lib/mock'
+import { CATEGORY_GRADIENTS, countryFlag } from '../lib/mock'
 import { useAuth } from '../lib/AuthContext'
 import BottomNav from '../components/BottomNav'
 
@@ -13,11 +13,24 @@ const TABS = [
   { id: 'liked',     label: 'אהבתי'         },
 ]
 
+// Countries for community filter
+const COUNTRY_FILTERS = [
+  { code: null, label: '🌍 כולם' },
+  { code: 'Germany', label: '🇩🇪 גרמניה' },
+  { code: 'United States', label: '🇺🇸 ארה״ב' },
+  { code: 'United Kingdom', label: '🇬🇧 בריטניה' },
+  { code: 'France', label: '🇫🇷 צרפת' },
+  { code: 'Australia', label: '🇦🇺 אוסטרליה' },
+  { code: 'Canada', label: '🇨🇦 קנדה' },
+]
+
 function RecipeCard({ recipe, onClick }) {
   const gradient = CATEGORY_GRADIENTS[recipe.category] || 'linear-gradient(160deg, #1e3a6e, #3d6fa8)'
   const bgStyle  = recipe.image_url
     ? { backgroundImage: `url(${recipe.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
     : { background: gradient }
+  const likesCount    = recipe.likes?.[0]?.count    ?? recipe.likes_count    ?? 0
+  const commentsCount = recipe.recipe_comments?.[0]?.count ?? recipe.comments_count ?? 0
 
   return (
     <div className="rcard" style={bgStyle} onClick={onClick}>
@@ -30,8 +43,8 @@ function RecipeCard({ recipe, onClick }) {
             <span>{recipe.users?.full_name || 'אנונימי'}</span>
           </div>
           <div className="rcard-stats">
-            {recipe.likes_count > 0 && <span className="stat-row"><IconHeart size={13}/> {recipe.likes_count}</span>}
-            {recipe.comments_count > 0 && <span className="stat-row"><IconMessageCircle size={13}/> {recipe.comments_count}</span>}
+            {likesCount > 0    && <span className="stat-row"><IconHeart size={13}/> {likesCount}</span>}
+            {commentsCount > 0 && <span className="stat-row"><IconMessageCircle size={13}/> {commentsCount}</span>}
           </div>
         </div>
       </div>
@@ -52,30 +65,85 @@ function EmptyState({ icon, text, sub, btnText, onBtn }) {
 
 export default function Recipes() {
   const navigate = useNavigate()
-  const { user, loading: authLoading } = useAuth()
-  const [tab, setTab]               = useState('mine')
-  const [myRecipes, setMyRecipes]   = useState([])
-  const [community, setCommunity]   = useState(mockRecipes)
-  const [saved, setSaved]           = useState([])
-  const [liked, setLiked]           = useState([])
-  const [loading, setLoading]       = useState(false)
+  const { user, profile, loading: authLoading } = useAuth()
+  const [tab, setTab]             = useState('mine')
+  const [myRecipes, setMyRecipes] = useState([])
+  const [community, setCommunity] = useState([])
+  const [saved, setSaved]         = useState([])
+  const [liked, setLiked]         = useState([])
+  const [loading, setLoading]     = useState(false)
+  const [communityCountry, setCommunityCountry] = useState(null) // null = all
+
+  // Set default community country to user's country
+  useEffect(() => {
+    if (profile?.country && communityCountry === null) {
+      // Check if user country is in our filter list
+      const found = COUNTRY_FILTERS.find(f => f.code === profile.country)
+      if (found) setCommunityCountry(profile.country)
+    }
+  }, [profile])
 
   useEffect(() => {
     if (!authLoading && user) {
       loadMyRecipes(user.id)
       loadLiked(user.id)
+      loadSaved(user.id)
     }
   }, [user, authLoading])
+
+  // Reload community when tab changes to community or country changes
+  useEffect(() => {
+    if (tab === 'community') loadCommunity()
+  }, [tab, communityCountry])
 
   async function loadMyRecipes(userId) {
     setLoading(true)
     const { data } = await supabase
       .from('recipes')
-      .select('*, users(full_name, country, city)')
+      .select('*, users(full_name, country)')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
     setMyRecipes(data || [])
     setLoading(false)
+  }
+
+  const loadCommunity = useCallback(async () => {
+    setLoading(true)
+    let query = supabase
+      .from('recipes')
+      .select(`
+        id, title, category, image_url, created_at,
+        users(full_name, country),
+        likes(count),
+        recipe_comments(count)
+      `)
+      .eq('is_public', true)
+      .order('created_at', { ascending: false })
+      .limit(40)
+
+    if (communityCountry) {
+      // Filter by users who live in this country
+      query = query.eq('users.country', communityCountry)
+    }
+
+    const { data } = await query
+    setCommunity(data || [])
+    setLoading(false)
+  }, [communityCountry])
+
+  async function loadSaved(userId) {
+    const { data: savedRows } = await supabase
+      .from('saved')
+      .select('recipe_id')
+      .eq('user_id', userId)
+    if (!savedRows?.length) return setSaved([])
+    const ids = savedRows.map(s => s.recipe_id)
+    const { data } = await supabase
+      .from('recipes')
+      .select('*, users(full_name, country)')
+      .in('id', ids)
+      .order('created_at', { ascending: false })
+    setSaved(data || [])
   }
 
   async function loadLiked(userId) {
@@ -83,11 +151,11 @@ export default function Recipes() {
       .from('likes')
       .select('recipe_id')
       .eq('user_id', userId)
-    if (!likeRows?.length) return
+    if (!likeRows?.length) return setLiked([])
     const ids = likeRows.map(l => l.recipe_id)
     const { data } = await supabase
       .from('recipes')
-      .select('*, users(full_name, country, city)')
+      .select('*, users(full_name, country)')
       .in('id', ids)
       .order('created_at', { ascending: false })
     setLiked(data || [])
@@ -95,14 +163,12 @@ export default function Recipes() {
 
   return (
     <div className="page page-with-nav">
-      {/* Topbar */}
       <div className="topbar">
         <div style={{ width:40 }} />
         <span className="topbar-title">מתכונים</span>
         <div style={{ width:40 }} />
       </div>
 
-      {/* Tabs */}
       <div className="filter-tabs" style={{ padding:'12px 16px 0', gap:0, borderBottom:'1px solid var(--border)' }}>
         {TABS.map(t => (
           <button
@@ -121,7 +187,6 @@ export default function Recipes() {
         ))}
       </div>
 
-      {/* Content */}
       <div className="page-scroll" style={{ padding:'16px 16px 24px' }}>
 
         {/* ── המתכונים שלי ── */}
@@ -144,10 +209,21 @@ export default function Recipes() {
         {tab === 'community' && (
           <>
             <div style={{ display:'flex', gap:8, overflowX:'auto', marginBottom:12, paddingBottom:4, scrollbarWidth:'none' }}>
-              {['🌍 כולם','🇩🇪 גרמניה','🇺🇸 ארה״ב','🇬🇧 בריטניה','🇫🇷 צרפת','🇦🇺 אוסטרליה'].map(c => (
-                <button key={c} className="filter-tab" style={{ flexShrink:0 }}>{c}</button>
+              {COUNTRY_FILTERS.map(c => (
+                <button
+                  key={c.label}
+                  className={`filter-tab ${communityCountry === c.code ? 'active' : ''}`}
+                  style={{ flexShrink:0 }}
+                  onClick={() => setCommunityCountry(c.code)}
+                >
+                  {c.label}
+                </button>
               ))}
             </div>
+            {loading && <p style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>טוענים...</p>}
+            {!loading && community.length === 0 && (
+              <EmptyState icon="🌍" text="אין מתכונים עדיין" sub="היו הראשונים לשתף מתכון עם הקהילה" btnText="הוספת מתכון" onBtn={() => navigate('/add')} />
+            )}
             {community.map(r => (
               <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`)} />
             ))}
@@ -157,8 +233,11 @@ export default function Recipes() {
         {/* ── שמורים ── */}
         {tab === 'saved' && (
           <>
-            {saved.length === 0 && (
-              <EmptyState icon="🔖" text="עדיין אין מתכונים שמורים" sub="לחצו על הסימנייה בכל מתכון כדי לשמור אותו" />
+            {!authLoading && !user && (
+              <EmptyState icon="🔒" text="צריך להתחבר" sub="התחברו כדי לראות מתכונים שמורים" btnText="כניסה לחשבון" onBtn={() => navigate('/login')} />
+            )}
+            {user && saved.length === 0 && (
+              <EmptyState icon="🔖" text="עדיין אין מתכונים שמורים" sub="לחצו על הסימנייה בעמוד מתכון כדי לשמור" />
             )}
             {saved.map(r => (
               <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`)} />

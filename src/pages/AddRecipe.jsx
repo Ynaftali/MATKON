@@ -71,7 +71,7 @@ export default function AddRecipe() {
       const res = await fetch('/api/parse-recipe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...body, userId: user?.id }),
       })
       const data = await res.json()
 

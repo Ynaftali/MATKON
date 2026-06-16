@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import {
   IconChevronRight, IconShare, IconClock, IconUsers, IconStar,
   IconMessageCircle, IconShoppingCart, IconAlertTriangle, IconExternalLink,
-  IconHeart, IconSend, IconCheck, IconCamera
+  IconHeart, IconBookmark, IconSend, IconCheck, IconCamera
 } from '@tabler/icons-react'
 import { mockRecipes, CATEGORY_GRADIENTS, countryFlag } from '../lib/mock'
 import { supabase } from '../lib/supabase'
@@ -30,8 +30,10 @@ export default function RecipePage() {
   const [loading, setLoading]     = useState(true)
   const [servings, setServings]   = useState(4)
 
-  const [liked, setLiked]           = useState(false)
+  const [liked, setLiked]             = useState(false)
   const [likeLoading, setLikeLoading] = useState(false)
+  const [saved, setSaved]             = useState(false)
+  const [saveLoading, setSaveLoading] = useState(false)
   const [toast, setToast]           = useState('')
   const [shoppingOpen, setShoppingOpen]   = useState(false)
   const [shoppingDone, setShoppingDone]   = useState({})
@@ -79,7 +81,10 @@ export default function RecipePage() {
     }
     setLoading(false)
     loadComments(id)
-    if (currentUser) loadLike(id)
+    if (currentUser) {
+      loadLike(id)
+      loadSaved(id)
+    }
   }
 
   async function loadLike(recipeId) {
@@ -90,6 +95,32 @@ export default function RecipePage() {
       .eq('user_id', currentUser.id)
       .maybeSingle()
     setLiked(!!data)
+  }
+
+  async function loadSaved(recipeId) {
+    const { data } = await supabase
+      .from('saved')
+      .select('id')
+      .eq('recipe_id', recipeId)
+      .eq('user_id', currentUser.id)
+      .maybeSingle()
+    setSaved(!!data)
+  }
+
+  async function toggleSave() {
+    if (!currentUser) { navigate('/login'); return }
+    if (saveLoading) return
+    setSaveLoading(true)
+    if (saved) {
+      await supabase.from('saved').delete().eq('recipe_id', id).eq('user_id', currentUser.id)
+      setSaved(false)
+      showToast('הוסר מהשמורים')
+    } else {
+      await supabase.from('saved').insert({ recipe_id: id, user_id: currentUser.id })
+      setSaved(true)
+      showToast('נשמר ✓')
+    }
+    setSaveLoading(false)
   }
 
   const ratio     = recipe ? servings / (recipe.servings || 4) : 1
@@ -165,7 +196,7 @@ export default function RecipePage() {
         const res = await fetch('/api/translate-ingredients', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ingredients: recipe.ingredients, country }),
+          body: JSON.stringify({ ingredients: recipe.ingredients, country, userId: currentUser?.id }),
         })
         if (res.ok) {
           const { enriched } = await res.json()
@@ -263,6 +294,14 @@ export default function RecipePage() {
               aria-label={liked ? 'הסירו מהאהובים' : 'הוסיפו לאהובים'}
             >
               <IconHeart size={20} fill={liked ? '#e05252' : 'none'} color={liked ? '#e05252' : 'currentColor'} />
+            </button>
+            <button
+              className={`btn-icon${saved ? ' liked' : ''}`}
+              onClick={toggleSave}
+              disabled={saveLoading}
+              aria-label={saved ? 'הסירו מהשמורים' : 'שמרו מתכון'}
+            >
+              <IconBookmark size={20} fill={saved ? 'var(--blue-light)' : 'none'} color={saved ? 'var(--blue-light)' : 'currentColor'} />
             </button>
             <button className="btn-icon" onClick={handleShare} aria-label="שיתוף">
               <IconShare size={20} />

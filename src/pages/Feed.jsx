@@ -1,17 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IconSearch, IconPlus, IconHeart, IconMessageCircle } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
-import { mockRecipes, CATEGORY_GRADIENTS } from '../lib/mock'
+import { CATEGORY_GRADIENTS, countryFlag } from '../lib/mock'
 import BottomNav from '../components/BottomNav'
 
-const FILTERS = ['הכל', 'בשרי', 'טבעוני', 'ארוחת בוקר', 'קינוחים', '🇩🇪', '🇺🇸', '🇫🇷', '🇳🇿']
+const FILTERS = ['הכל', 'בשרי', 'טבעוני', 'חלבי', 'ארוחת בוקר', 'קינוחים']
 
 function RecipeCard({ recipe, onClick }) {
   const user      = recipe.users || {}
   const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0)
   const gradient  = CATEGORY_GRADIENTS[recipe.category] || 'linear-gradient(160deg, #1e3a6e, #3d6fa8)'
-  const flag      = user.country_flag || ''
+  const likesCount    = recipe.likes?.[0]?.count    ?? 0
+  const commentsCount = recipe.recipe_comments?.[0]?.count ?? 0
 
   const bgStyle = recipe.image_url
     ? { backgroundImage: `url(${recipe.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
@@ -24,18 +25,13 @@ function RecipeCard({ recipe, onClick }) {
         <div className="rcard-title">{recipe.title}</div>
         <div className="rcard-meta">
           <div className="rcard-author">
-            <span>🇮🇱 {flag}</span>
+            <span>🇮🇱 {countryFlag(user.country)}</span>
             <span>{user.full_name || 'אנונימי'}</span>
-            {user.city && <span style={{ color: 'var(--text-muted)' }}>· {user.city}</span>}
           </div>
           <div className="rcard-stats">
-            {totalTime > 0 && <span className="stat-row">⏱ {totalTime}</span>}
-            {recipe.likes_count > 0 && (
-              <span className="stat-row"><IconHeart size={13} /> {recipe.likes_count}</span>
-            )}
-            {recipe.comments_count > 0 && (
-              <span className="stat-row"><IconMessageCircle size={13} /> {recipe.comments_count}</span>
-            )}
+            {totalTime > 0    && <span className="stat-row">⏱ {totalTime}ד'</span>}
+            {likesCount > 0   && <span className="stat-row"><IconHeart size={13} /> {likesCount}</span>}
+            {commentsCount > 0 && <span className="stat-row"><IconMessageCircle size={13} /> {commentsCount}</span>}
           </div>
         </div>
       </div>
@@ -45,46 +41,41 @@ function RecipeCard({ recipe, onClick }) {
 
 export default function Feed() {
   const navigate = useNavigate()
-  const [recipes, setRecipes]   = useState([])
-  const [loading, setLoading]   = useState(true)
-  const [search, setSearch]     = useState('')
-  const [filter, setFilter]     = useState('הכל')
+  const [recipes, setRecipes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch]   = useState('')
+  const [filter, setFilter]   = useState('הכל')
 
-  useEffect(() => {
-    // Show mock recipes immediately — all have images
-    setRecipes(mockRecipes)
+  const loadRecipes = useCallback(async () => {
+    setLoading(true)
+    let query = supabase
+      .from('recipes')
+      .select(`
+        id, title, description, category, image_url, prep_time, cook_time, tags, created_at,
+        users(full_name, country),
+        likes(count),
+        recipe_comments(count)
+      `)
+      .eq('is_public', true)
+      .order('created_at', { ascending: false })
+      .limit(40)
+
+    if (filter !== 'הכל') query = query.eq('category', filter)
+
+    const { data, error } = await query
+    if (!error && data) setRecipes(data)
     setLoading(false)
+  }, [filter])
 
-    // Then enrich with Supabase data in the background
-    async function syncFromSupabase() {
-      const { data, error } = await supabase
-        .from('recipes')
-        .select('id, title, image_url, users(full_name, avatar_url, country)')
-        .eq('is_public', true)
-        .order('created_at', { ascending: false })
-        .limit(20)
+  useEffect(() => { loadRecipes() }, [loadRecipes])
 
-      if (error || !data?.length) return
-
-      // Patch image_url from Supabase into matching mock recipes
-      setRecipes(prev => prev.map(r => {
-        const match = data.find(d => d.title === r.title)
-        if (match?.image_url) return { ...r, image_url: match.image_url }
-        return r
-      }))
-    }
-    syncFromSupabase()
-  }, [])
-
-  const visible = recipes.filter(r => {
-    if (search && !r.title?.includes(search) && !r.description?.includes(search)) return false
-    if (filter === 'הכל') return true
-    if (filter === 'בשרי')       return r.category === 'בשרי'
-    if (filter === 'טבעוני')     return r.category === 'טבעוני'
-    if (filter === 'ארוחת בוקר') return r.category === 'ארוחת בוקר'
-    if (filter === 'קינוחים')    return r.category === 'קינוחים'
-    return true
-  })
+  const visible = search
+    ? recipes.filter(r =>
+        r.title?.includes(search) ||
+        r.description?.includes(search) ||
+        r.tags?.some(t => t.includes(search))
+      )
+    : recipes
 
   return (
     <div className="feed-page page-with-nav">
@@ -95,7 +86,7 @@ export default function Feed() {
         <div className="search-bar">
           <IconSearch size={18} />
           <input
-            placeholder="חפשו מתכון, מצרך, מדינה..."
+            placeholder="חפשו מתכון, מצרך, קטגוריה..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -104,16 +95,24 @@ export default function Feed() {
 
       <div className="filter-tabs">
         {FILTERS.map(f => (
-          <button key={f} className={`filter-tab ${filter === f ? 'active' : ''}`} onClick={() => setFilter(f)}>
+          <button
+            key={f}
+            className={`filter-tab ${filter === f ? 'active' : ''}`}
+            onClick={() => setFilter(f)}
+          >
             {f}
           </button>
         ))}
       </div>
 
       <div className="feed-list">
-        {loading && <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>טוענים מתכונים...</div>}
+        {loading && (
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>טוענים מתכונים...</div>
+        )}
         {!loading && visible.length === 0 && (
-          <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>לא נמצאו מתכונים</div>
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+            {search ? 'לא נמצאו מתכונים לחיפוש זה' : 'עדיין אין מתכונים — היו הראשונים!'}
+          </div>
         )}
         {visible.map(r => (
           <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`)} />

@@ -1,11 +1,30 @@
+import { adminInsert, adminCount } from './_supabase.js'
+
 export const config = { runtime: 'nodejs' }
+
+const RATE_LIMIT_PER_HOUR = 20
+const MODEL = 'claude-haiku-4-5'
+const COST_PER_INPUT_TOKEN  = 0.0000008
+const COST_PER_OUTPUT_TOKEN = 0.000004
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const { ingredients, country } = req.body || {}
+  const { ingredients, country, userId } = req.body || {}
   if (!ingredients?.length || !country) {
     return res.status(400).json({ error: 'Missing ingredients or country' })
+  }
+
+  // ── Rate limiting ────────────────────────────────────
+  if (userId) {
+    const oneHourAgo = new Date(Date.now() - 3600_000).toISOString()
+    const count = await adminCount(
+      'usage_log',
+      `user_id=eq.${userId}&endpoint=eq.translate-ingredients&created_at=gte.${oneHourAgo}`
+    )
+    if (count >= RATE_LIMIT_PER_HOUR) {
+      return res.status(429).json({ error: 'הגעתם למגבלת השימוש. נסו שוב בעוד שעה.' })
+    }
   }
 
   const system = `You are a culinary assistant. Given a list of recipe ingredients and a country, return a JSON array with:
@@ -33,12 +52,12 @@ Rules:
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'Content-Type':      'application/json',
+        'x-api-key':         process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5',
+        model:      MODEL,
         max_tokens: 1024,
         system,
         messages: [{ role: 'user', content: `Country: ${country}\n\nIngredients:\n${ingredientList}` }],
@@ -48,7 +67,20 @@ Rules:
     if (!response.ok) return res.status(500).json({ error: 'AI error' })
 
     const data = await response.json()
-    const raw = data.content[0].text.trim().replace(/^```json?\n?/i,'').replace(/\n?```$/,'')
+    const inputTokens  = data.usage?.input_tokens  || 0
+    const outputTokens = data.usage?.output_tokens || 0
+    const costUsd      = (inputTokens * COST_PER_INPUT_TOKEN) + (outputTokens * COST_PER_OUTPUT_TOKEN)
+
+    adminInsert('usage_log', {
+      user_id:       userId || null,
+      endpoint:      'translate-ingredients',
+      model:         MODEL,
+      input_tokens:  inputTokens,
+      output_tokens: outputTokens,
+      cost_usd:      costUsd,
+    })
+
+    const raw = data.content[0].text.trim().replace(/^```json?\n?/i, '').replace(/\n?```$/, '')
     const result = JSON.parse(raw)
     return res.status(200).json({ enriched: result })
   } catch (err) {
