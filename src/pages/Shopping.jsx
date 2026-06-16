@@ -142,10 +142,13 @@ export default function Shopping() {
 }
 
 function ShoppingRow({ item, enriched, onToggle }) {
-  const qtyStr    = item.qty > 0 ? `${item.qty} ${item.unit} ` : ''
+  // Don't show unit if it duplicates the ingredient name
+  const unit      = item.unit && item.unit !== item.name ? item.unit : ''
+  const qtyStr    = item.qty > 0 ? `${item.qty}${unit ? ' ' + unit : ''} ` : ''
   const localName = enriched?.name_local || item.name_local
   const localStr  = localName && localName !== item.name ? ` · ${localName}` : ''
   const whereBuy  = enriched?.where_to_buy
+
   return (
     <div
       className={`shopping-item ${item.checked ? 'checked' : ''}`}
@@ -155,19 +158,19 @@ function ShoppingRow({ item, enriched, onToggle }) {
       <div className="shopping-check">
         {item.checked ? <IconCheck size={14} /> : ''}
       </div>
-      <div style={{ flex: 1 }}>
-        <div className="shopping-name">
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="shopping-name" style={{ wordBreak: 'break-word' }}>
           {qtyStr}<strong>{item.name}</strong>
           <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>{localStr}</span>
         </div>
         {whereBuy && (
-          <div style={{ fontSize: '.72rem', color: 'var(--blue-light)', marginTop: 3 }}>
+          <div style={{ fontSize: '.72rem', color: 'var(--blue-light)', marginTop: 3, wordBreak: 'break-word' }}>
             📍 {whereBuy}
           </div>
         )}
         {item.recipes?.length > 0 && (
-          <div style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: 2 }}>
-            {item.recipes.join(' · ')}
+          <div style={{ fontSize: '.72rem', color: 'var(--blue-light)', opacity: 0.7, marginTop: 3 }}>
+            מתכון: {item.recipes.join(' · ')}
           </div>
         )}
       </div>
