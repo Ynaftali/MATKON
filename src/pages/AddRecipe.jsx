@@ -156,31 +156,48 @@ export default function AddRecipe() {
       } catch { /* keep Pollinations url */ }
     }
 
-    const { data, error } = await supabase.from('recipes').insert({
-      user_id:      user.id,
-      title:        recipe.title,
-      description:  recipe.description || '',
-      ingredients:  recipe.ingredients || [],
-      steps:        recipe.steps       || [],
-      prep_time:    recipe.prep_time   || 0,
-      cook_time:    recipe.cook_time   || 0,
-      servings:     recipe.servings    || 2,
-      category:     recipe.category    || 'אחר',
-      tags:         tags,
-      is_public:    isPublic,
-      image_url,
-      source_url:   inputType === 'link' ? url : null,
-    }).select('id').single()
-
-    setSaving(false)
-
-    if (error) {
-      setSaveError('שגיאה בשמירה: ' + error.message)
+    // Publish through the server-side moderation gate (the only path that can
+    // create a recipe — direct client inserts are revoked at the DB level).
+    const { data: { session } } = await supabase.auth.getSession()
+    let result
+    try {
+      const res = await fetch('/api/publish-recipe', {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
+        },
+        body: JSON.stringify({
+          recipe:     { ...recipe, tags },
+          tags,
+          isPublic,
+          image_url,
+          source_url: inputType === 'link' ? url : null,
+        }),
+      })
+      result = { status: res.status, body: await res.json() }
+    } catch {
+      setSaving(false)
+      setSaveError('בעיית תקשורת — נסו שוב')
       return
     }
 
-    setSavedId(data.id)
-    setStep(4)
+    setSaving(false)
+
+    if (result.status === 200) {
+      setSavedId(result.body.id)
+      setStep(4)
+      return
+    }
+
+    // Banned → bounce to the blocked screen
+    if (result.body?.banned) {
+      navigate('/blocked')
+      return
+    }
+
+    // Rejected by moderation or other error
+    setSaveError(result.body?.message || result.body?.reason || 'שגיאה בשמירת המתכון')
   }
 
   function handleImageUpload(e) {
