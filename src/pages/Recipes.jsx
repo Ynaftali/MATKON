@@ -203,7 +203,7 @@ export default function Recipes() {
               <EmptyState icon="🍳" text="עדיין אין לכם מתכונים" sub="הוסיפו את המתכון הראשון שלכם לקהילה" btnText="הוספת מתכון" onBtn={() => navigate('/add')} />
             )}
             {myRecipes.map(r => (
-              <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`)} />
+              <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`, { state: { recipe: r } })} />
             ))}
           </>
         )}
@@ -228,7 +228,7 @@ export default function Recipes() {
               <EmptyState icon="🌍" text="אין מתכונים עדיין" sub="היו הראשונים לשתף מתכון עם הקהילה" btnText="הוספת מתכון" onBtn={() => navigate('/add')} />
             )}
             {community.map(r => (
-              <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`)} />
+              <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`, { state: { recipe: r } })} />
             ))}
           </>
         )}
@@ -243,7 +243,7 @@ export default function Recipes() {
               <EmptyState icon="🔖" text="עדיין אין מתכונים שמורים" sub="לחצו על הסימנייה בעמוד מתכון כדי לשמור" />
             )}
             {saved.map(r => (
-              <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`)} />
+              <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`, { state: { recipe: r } })} />
             ))}
           </>
         )}
@@ -258,7 +258,7 @@ export default function Recipes() {
               <EmptyState icon="❤️" text="עדיין לא אהבתם מתכונים" sub='לחצו על ❤️ בכל מתכון כדי לשמור אותו כאן' />
             )}
             {liked.map(r => (
-              <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`)} />
+              <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`, { state: { recipe: r } })} />
             ))}
           </>
         )}

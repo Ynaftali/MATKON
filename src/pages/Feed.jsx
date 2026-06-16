@@ -63,7 +63,7 @@ export default function Feed() {
     if (filter !== 'הכל') query = query.eq('category', filter)
 
     const { data, error } = await query
-    if (!error && data) setRecipes(data)
+if (!error && data) setRecipes(data)
     setLoading(false)
   }, [filter])
 
@@ -115,7 +115,7 @@ export default function Feed() {
           </div>
         )}
         {visible.map(r => (
-          <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`)} />
+          <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`, { state: { recipe: r } })} />
         ))}
       </div>
 

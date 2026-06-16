@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
   IconChevronRight, IconShare, IconClock, IconUsers, IconStar,
   IconMessageCircle, IconShoppingCart, IconAlertTriangle, IconExternalLink,
@@ -25,9 +25,10 @@ function timeAgo(ts) {
 export default function RecipePage() {
   const { id }     = useParams()
   const navigate   = useNavigate()
+  const location   = useLocation()
 
-  const [recipe, setRecipe]       = useState(null)
-  const [loading, setLoading]     = useState(true)
+  const [recipe, setRecipe]       = useState(location.state?.recipe || null)
+  const [loading, setLoading]     = useState(!location.state?.recipe)
   const [servings, setServings]   = useState(4)
 
   const [liked, setLiked]             = useState(false)
@@ -63,7 +64,6 @@ export default function RecipePage() {
       .select('*, users(full_name, country, bio)')
       .eq('id', id)
       .single()
-    console.log('[RecipePage] id=', id, 'data=', data, 'error=', error)
     if (data) {
       setRecipe(data)
       setServings(data.servings || 4)
