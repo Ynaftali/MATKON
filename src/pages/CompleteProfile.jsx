@@ -6,14 +6,13 @@ import { useAuth } from '../lib/AuthContext'
 export default function CompleteProfile() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [city, setCity]     = useState('')
-  const [bio, setBio]       = useState('')
+  const [bio, setBio]         = useState('')
   const [loading, setLoading] = useState(false)
 
   async function save() {
     if (!user) { navigate('/feed'); return }
     setLoading(true)
-    await supabase.from('users').upsert({ id: user.id, city, bio })
+    await supabase.from('users').upsert({ id: user.id, bio })
     setLoading(false)
     navigate('/feed')
   }
@@ -27,16 +26,6 @@ export default function CompleteProfile() {
       </div>
 
       <div className="auth-form">
-        <div className="auth-field">
-          <label className="auth-label">עיר מגורים</label>
-          <input
-            className="input"
-            placeholder="תל אביב? ברלין? ניו יורק?"
-            value={city}
-            onChange={e => setCity(e.target.value)}
-          />
-        </div>
-
         <div className="auth-field">
           <label className="auth-label">משפט על עצמכם</label>
           <textarea

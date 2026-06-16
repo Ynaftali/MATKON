@@ -5,11 +5,11 @@ import { mockCommunities, mockRecipes, CATEGORY_GRADIENTS } from '../lib/mock'
 import BottomNav from '../components/BottomNav'
 
 const MEMBERS = [
-  { name: 'ינון נפתלי',  flag: '🇮🇱 🇳🇿', city: 'אוקלנד' },
-  { name: 'מיכל כהן',   flag: '🇮🇱 🇩🇪', city: 'ברלין' },
-  { name: 'יוני לוי',   flag: '🇮🇱 🇺🇸', city: 'ניו יורק' },
-  { name: 'דנה מזרחי',  flag: '🇮🇱 🇫🇷', city: 'פריז' },
-  { name: 'עמית שרון',  flag: '🇮🇱 🇬🇧', city: 'לונדון' },
+  { name: 'ינון נפתלי',  flag: '🇮🇱 🇳🇿' },
+  { name: 'מיכל כהן',   flag: '🇮🇱 🇩🇪' },
+  { name: 'יוני לוי',   flag: '🇮🇱 🇺🇸' },
+  { name: 'דנה מזרחי',  flag: '🇮🇱 🇫🇷' },
+  { name: 'עמית שרון',  flag: '🇮🇱 🇬🇧' },
 ]
 
 export default function Community() {
@@ -69,7 +69,7 @@ export default function Community() {
             <div className="profile-recipe-info">
               <div className="profile-recipe-title">{r.title}</div>
               <div className="profile-recipe-meta">
-                <span className="tag tag-blue" style={{ fontSize: '.7rem' }}>📍 {r.users?.city || comm.country_name}</span>
+                <span className="tag tag-blue" style={{ fontSize: '.7rem' }}>📍 {comm.country_name}</span>
               </div>
               <div className="profile-recipe-tags">
                 <span className="stat-row"><IconHeart size={12}/> {r.likes_count}</span>
@@ -84,7 +84,6 @@ export default function Community() {
             <div className="avatar avatar-sm">{m.name[0]}</div>
             <div className="member-info">
               <div className="member-name">{m.flag} {m.name}</div>
-              <div className="member-loc">📍 {m.city}</div>
             </div>
           </div>
         ))}

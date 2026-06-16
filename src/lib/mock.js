@@ -6,7 +6,7 @@ export const mockUser = {
   email: 'ynon@example.com',
   country: 'ניו זילנד',
   country_flag: '🇳🇿',
-  city: 'אוקלנד',
+
   bio: 'שף חובב שמבשל ישראלי בניו זילנד. מתמחה בפיוז\'ן ים תיכוני.',
   recipes_count: 12,
   shared_count: 8,
@@ -37,7 +37,7 @@ export const mockRecipes = [
     servings: 6,
     level: 'קל',
     is_public: true,
-    users: { full_name: 'מיכל כהן', country: 'גרמניה', country_flag: '🇩🇪', city: 'ברלין' },
+    users: { full_name: 'מיכל כהן', country: 'גרמניה', country_flag: '🇩🇪' },
     likes_count: 42,
     comments_count: 8,
     ingredients: [
@@ -68,7 +68,7 @@ export const mockRecipes = [
     servings: 2,
     level: 'קל',
     is_public: true,
-    users: { full_name: 'יוני לוי', country: 'ארה"ב', country_flag: '🇺🇸', city: 'ניו יורק' },
+    users: { full_name: 'יוני לוי', country: 'ארה"ב', country_flag: '🇺🇸' },
     likes_count: 89,
     comments_count: 15,
     ingredients: [
@@ -100,7 +100,7 @@ export const mockRecipes = [
     servings: 4,
     level: 'קל',
     is_public: true,
-    users: { full_name: 'דנה מזרחי', country: 'צרפת', country_flag: '🇫🇷', city: 'פריז' },
+    users: { full_name: 'דנה מזרחי', country: 'צרפת', country_flag: '🇫🇷' },
     likes_count: 56,
     comments_count: 12,
     ingredients: [
@@ -130,7 +130,7 @@ export const mockRecipes = [
     servings: 24,
     level: 'בינוני',
     is_public: true,
-    users: { full_name: 'ינון נפתלי', country: 'ניו זילנד', country_flag: '🇳🇿', city: 'אוקלנד' },
+    users: { full_name: 'ינון נפתלי', country: 'ניו זילנד', country_flag: '🇳🇿' },
     likes_count: 73,
     comments_count: 21,
     ingredients: [

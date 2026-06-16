@@ -60,7 +60,7 @@ export default function RecipePage() {
     // Try Supabase first
     const { data, error } = await supabase
       .from('recipes')
-      .select('*, users(full_name, country, city, bio)')
+      .select('*, users(full_name, country, bio)')
       .eq('id', id)
       .single()
     console.log('[RecipePage] id=', id, 'data=', data, 'error=', error)
@@ -330,7 +330,7 @@ export default function RecipePage() {
           </div>
           <div className="rpage-author-info">
             <div className="rpage-author-name">🇮🇱 {countryFlag(user.country)} {user.full_name}</div>
-            <div className="rpage-author-loc">{[user.city, user.country].filter(Boolean).join(', ')}</div>
+            <div className="rpage-author-loc">{user.country || ''}</div>
           </div>
         </div>
 
