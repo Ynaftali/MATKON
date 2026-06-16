@@ -113,14 +113,14 @@ export default function Profile() {
     navigate('/')
   }
 
-  if (authLoading) return (
+  if (authLoading || (user && !profile)) return (
     <div className="page" style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh' }}>
       <p style={{ color:'var(--text-muted)' }}>טוענים...</p>
     </div>
   )
 
-  const fullName = profile?.full_name || user?.user_metadata?.full_name || 'משתמש'
-  const country  = profile?.country  || user?.user_metadata?.country  || ''
+  const fullName = profile?.full_name || 'משתמש'
+  const country  = profile?.country  || ''
   const initials = fullName.split(' ').map(w => w[0]).filter(Boolean).join('').slice(0, 2) || '?'
   const flag     = countryFlag(country)
 
