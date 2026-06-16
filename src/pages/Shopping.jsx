@@ -169,7 +169,7 @@ function ShoppingRow({ item, enriched, onToggle }) {
           </div>
         )}
         {item.recipes?.length > 0 && (
-          <div style={{ fontSize: '.72rem', color: 'var(--blue-light)', opacity: 0.7, marginTop: 3 }}>
+          <div style={{ fontSize: '.72rem', color: 'var(--green)', marginTop: 3 }}>
             מתכון: {item.recipes.join(' · ')}
           </div>
         )}

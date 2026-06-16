@@ -71,7 +71,7 @@ export default function Recipes() {
   const [community, setCommunity] = useState([])
   const [saved, setSaved]         = useState([])
   const [liked, setLiked]         = useState([])
-  const [loading, setLoading]     = useState(false)
+  const [loading, setLoading]     = useState(true)
   const [communityCountry, setCommunityCountry] = useState(null) // null = all
 
   // Set default community country to user's country
@@ -84,10 +84,13 @@ export default function Recipes() {
   }, [profile])
 
   useEffect(() => {
-    if (!authLoading && user) {
+    if (authLoading) return
+    if (user) {
       loadMyRecipes(user.id)
       loadLiked(user.id)
       loadSaved(user.id)
+    } else {
+      setLoading(false)
     }
   }, [user, authLoading])
 
