@@ -88,7 +88,7 @@ export default async function handler(req, res) {
   "level": "קל",
   "category": "אחת מ: ארוחת בוקר / בשרי / חלבי / טבעוני / קינוחים / שתייה / אחר",
   "tags": ["ישראלי", "ביתי"],
-  "image_search": "hummus chickpeas"
+  "image_search": "hard boiled eggs halved on white plate, yolk visible"
 }
 
 כללים:
@@ -97,7 +97,7 @@ export default async function handler(req, res) {
 - אם חסר מידע, השתמש בערכי ברירת מחדל הגיוניים
 - tags: בחר 2-4 תגיות רלוונטיות
 - level: קל / בינוני / מתקדם
-- image_search: 2-3 מילים באנגלית שמתארות את המנה לחיפוש תמונה
+- image_search: תיאור ויזואלי מדויק באנגלית (8-12 מילים) של המנה הסופית כפי שהיא נראית בצלחת, בהתבסס על המרכיבים ואופן ההכנה. לדוגמה: "hard boiled eggs halved on white plate" ולא "eggs". הוסף בסוף ", appetizing food photography, natural lighting"
 - duration_seconds: אם בשלב כתוב זמן (למשל "בשלו 40 דקות") — המר לשניות. אחרת null`
 
   try {
