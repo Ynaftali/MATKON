@@ -110,6 +110,30 @@ export async function deleteStoragePrefix(bucket, prefix) {
   } catch {}
 }
 
+// Delete specific objects from a storage bucket by full path. Never throws.
+// paths e.g. ['<user_id>/123.jpg']
+export async function deleteStorageObjects(bucket, paths) {
+  if (!SERVICE_ROLE_KEY || !paths?.length) return
+  try {
+    await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}`, {
+      method:  'DELETE',
+      headers: adminHeaders(),
+      body:    JSON.stringify({ prefixes: paths }),
+    })
+  } catch {}
+}
+
+// Given a Supabase public storage URL, extract the object path within the bucket,
+// e.g. ".../object/public/recipe-images/<uid>/1.jpg" → "<uid>/1.jpg". Null if not ours.
+export function storagePathFromPublicUrl(bucket, url) {
+  if (typeof url !== 'string') return null
+  const marker = `/storage/v1/object/public/${bucket}/`
+  const i = url.indexOf(marker)
+  if (i === -1) return null
+  try { return decodeURIComponent(url.slice(i + marker.length).split('?')[0]) || null }
+  catch { return null }
+}
+
 // Verify a Supabase access token and return the authenticated user, or null.
 // Never trust a userId from the request body — always derive identity from the token.
 export async function getUserFromToken(authHeader) {

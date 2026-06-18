@@ -37,6 +37,7 @@ import Feed            from './pages/Feed'
 import RecipePage      from './pages/RecipePage'
 import CookingMode     from './pages/CookingMode'
 import AddRecipe       from './pages/AddRecipe'
+import EditRecipe      from './pages/EditRecipe'
 import Profile         from './pages/Profile'
 import MapPage         from './pages/MapPage'
 import Community       from './pages/Community'
@@ -62,6 +63,7 @@ export default function App() {
         <Route path="/recipe/:id"       element={<RecipePage />}      />
         <Route path="/cook/:id"         element={<CookingMode />}     />
         <Route path="/add"              element={<AddRecipe />}        />
+        <Route path="/edit/:id"         element={<EditRecipe />}       />
         <Route path="/profile"          element={<Profile />}         />
         <Route path="/map"              element={<MapPage />}         />
         <Route path="/community/:country" element={<Community />}    />

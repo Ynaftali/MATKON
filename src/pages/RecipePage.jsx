@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
   IconChevronRight, IconShare, IconClock, IconUsers, IconStar,
   IconMessageCircle, IconShoppingCart, IconAlertTriangle, IconExternalLink,
-  IconHeart, IconBookmark, IconSend, IconCheck, IconCamera
+  IconHeart, IconBookmark, IconSend, IconCheck, IconCamera, IconPencil
 } from '@tabler/icons-react'
 import { mockRecipes, CATEGORY_GRADIENTS, countryFlag } from '../lib/mock'
 import { supabase } from '../lib/supabase'
@@ -283,9 +283,14 @@ export default function RecipePage() {
           </button>
           <div style={{ display: 'flex', gap: 8 }}>
             {currentUser && recipe.user_id === currentUser.id && (
-              <button className="btn-icon hero-camera-btn" onClick={() => imgEditRef.current?.click()} aria-label="החלף תמונה" title="החלף תמונה">
-                <IconCamera size={18} />
-              </button>
+              <>
+                <button className="btn-icon" onClick={() => navigate(`/edit/${recipe.id}`, { state: { recipe } })} aria-label="עריכת מתכון" title="עריכת מתכון">
+                  <IconPencil size={18} />
+                </button>
+                <button className="btn-icon hero-camera-btn" onClick={() => imgEditRef.current?.click()} aria-label="החלף תמונה" title="החלף תמונה">
+                  <IconCamera size={18} />
+                </button>
+              </>
             )}
             <button
               className={`btn-icon like-btn${liked ? ' liked' : ''}`}
