@@ -1,0 +1,36 @@
+name: Nightly DB Backup
+
+# Free automated logical backup of the Supabase database (public schema).
+# Runs every night and keeps each dump as a downloadable artifact for 30 days.
+# Requires repo secret SUPABASE_DB_URL = the Postgres connection URI
+# (Supabase → Settings → Database → Connection string → URI, session pooler).
+
+on:
+  schedule:
+    - cron: '0 2 * * *'   # 02:00 UTC daily
+  workflow_dispatch: {}    # allows manual "Run workflow" from the Actions tab
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set timestamp
+        id: ts
+        run: echo "stamp=$(date -u +'%Y-%m-%d_%H%M')" >> "$GITHUB_OUTPUT"
+
+      - name: Dump database (public schema)
+        run: |
+          docker run --rm postgres:17-alpine \
+            pg_dump "${{ secrets.SUPABASE_DB_URL }}" \
+            --schema=public --no-owner --no-privileges \
+            > "backup_${{ steps.ts.outputs.stamp }}.sql"
+
+      - name: Compress
+        run: gzip "backup_${{ steps.ts.outputs.stamp }}.sql"
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ steps.ts.outputs.stamp }}
+          path: backup_*.sql.gz
+          retention-days: 30
