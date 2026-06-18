@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconChevronRight, IconBrandGoogle, IconBrandApple } from '@tabler/icons-react'
+import { IconChevronRight } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
+import SsoButtons from '../components/SsoButtons'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -57,16 +58,7 @@ export default function Login() {
 
         <div className="auth-divider">או התחברו עם</div>
 
-        <div className="auth-sso">
-          <button type="button" className="auth-sso-btn auth-sso-google" onClick={() => navigate('/sso')}>
-            <IconBrandGoogle size={20} stroke={1.5} />
-            <span>Google</span>
-          </button>
-          <button type="button" className="auth-sso-btn auth-sso-apple" onClick={() => navigate('/sso')}>
-            <IconBrandApple size={20} stroke={1.5} />
-            <span>Apple</span>
-          </button>
-        </div>
+        <SsoButtons />
       </form>
 
       <div className="auth-footer">

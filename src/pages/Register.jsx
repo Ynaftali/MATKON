@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconChevronRight, IconBrandGoogle, IconBrandApple } from '@tabler/icons-react'
+import { IconChevronRight } from '@tabler/icons-react'
 import { COUNTRIES } from '../lib/mock'
 import { supabase } from '../lib/supabase'
+import SsoButtons from '../components/SsoButtons'
 
 const RULES = [
   { label: 'לפחות 8 תווים',      test: pw => pw.length >= 8 },
@@ -42,14 +43,9 @@ export default function Register() {
 
     if (error) { setError(error.message); setLoading(false); return }
 
-    if (data.user) {
-      await supabase.from('users').upsert({
-        id:        data.user.id,
-        full_name: `${form.firstName} ${form.lastName}`,
-        country:   form.country,
-        email:     form.email,
-      })
-    }
+    // The handle_new_user trigger already creates the public.users row from the
+    // signUp metadata (full_name, country). No client-side upsert needed — and the
+    // old one wrote to the dropped `email` column, which fails silently.
 
     setLoading(false)
     localStorage.setItem('pending_email', form.email)
@@ -139,16 +135,7 @@ export default function Register() {
 
         <div className="auth-divider">או הירשמו עם</div>
 
-        <div className="auth-sso">
-          <button type="button" className="auth-sso-btn auth-sso-google" onClick={() => navigate('/sso')}>
-            <IconBrandGoogle size={20} stroke={1.5} />
-            <span>Google</span>
-          </button>
-          <button type="button" className="auth-sso-btn auth-sso-apple" onClick={() => navigate('/sso')}>
-            <IconBrandApple size={20} stroke={1.5} />
-            <span>Apple</span>
-          </button>
-        </div>
+        <SsoButtons />
       </form>
 
       <div className="auth-footer">

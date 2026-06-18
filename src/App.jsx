@@ -16,16 +16,36 @@ function BanGuard() {
   return null
 }
 
+// Landing point after an OAuth (Google/Apple) redirect. Routes a brand-new user
+// through onboarding (country + ToS), and a returning user straight to the feed.
 function AuthCallback() {
   const navigate = useNavigate()
   useEffect(() => {
-    supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') {
-        navigate('/complete-profile', { replace: true })
-      }
+    let done = false
+    async function route(userId) {
+      if (done) return
+      done = true
+      const { data } = await supabase
+        .from('users')
+        .select('country, tos_accepted_at')
+        .eq('id', userId)
+        .maybeSingle()
+      const needsOnboarding = !data?.country || !data?.tos_accepted_at
+      navigate(needsOnboarding ? '/sso' : '/feed', { replace: true })
+    }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) route(session.user.id)
     })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) route(session.user.id)
+    })
+    return () => subscription.unsubscribe()
   }, [])
-  return null
+  return (
+    <div className="auth-page" style={{ textAlign: 'center', paddingTop: 80, color: 'var(--text-2)' }}>
+      מתחברים...
+    </div>
+  )
 }
 import Splash          from './pages/Splash'
 import Peek            from './pages/Peek'
