@@ -50,14 +50,45 @@ export default async function handler(req, res) {
   const { recipe, tags, isPublic, image_url, source_url, imageBase64 } = req.body || {}
   if (!recipe?.title) return res.status(400).json({ error: 'missing_recipe', message: 'חסרים פרטי מתכון' })
 
+  // ── Validate & normalize input server-side (never trust the client payload) ──
+  const clean = s => (typeof s === 'string' ? s.replace(/[\x00-\x1F\x7F]/g, '').trim() : '')
+  const clampStr = (s, max) => clean(s).slice(0, max)
+  const clampInt = (n, max) => { const v = parseInt(n, 10); return Number.isFinite(v) && v >= 0 ? Math.min(v, max) : 0 }
+  const isHttpUrl = u => typeof u === 'string' && /^https?:\/\//.test(u) && u.length <= 2048
+
+  const title = clampStr(recipe.title, 200)
+  if (!title) return res.status(400).json({ error: 'invalid_title', message: 'כותרת המתכון אינה תקינה' })
+
+  const safeRecipe = {
+    title,
+    description: clampStr(recipe.description, 2000),
+    category:   clampStr(recipe.category, 40) || 'אחר',
+    ingredients: (Array.isArray(recipe.ingredients) ? recipe.ingredients : []).slice(0, 100).map(i => ({
+      name:   clampStr(i?.name, 120),
+      amount: clampStr(String(i?.amount ?? ''), 40),
+      unit:   clampStr(i?.unit, 40),
+    })).filter(i => i.name),
+    steps: (Array.isArray(recipe.steps) ? recipe.steps : []).slice(0, 100).map((s, idx) => ({
+      order: idx + 1,
+      text:  clampStr(s?.text, 2000),
+      duration_seconds: s?.duration_seconds == null ? null : clampInt(s.duration_seconds, 86400),
+    })).filter(s => s.text),
+    prep_time: clampInt(recipe.prep_time, 10000),
+    cook_time: clampInt(recipe.cook_time, 10000),
+    servings:  clampInt(recipe.servings, 1000) || 2,
+  }
+  const safeTags   = (Array.isArray(tags) ? tags : []).slice(0, 20).map(t => clampStr(t, 40)).filter(Boolean)
+  const safeImage  = isHttpUrl(image_url)  ? image_url  : null
+  const safeSource = isHttpUrl(source_url) ? source_url : null
+
   // ── Build moderation input: text + image (if any) ──
   const textBlob = [
-    `כותרת: ${recipe.title}`,
-    `תיאור: ${recipe.description || ''}`,
-    `קטגוריה: ${recipe.category || ''}`,
-    `תגיות: ${(tags || []).join(', ')}`,
-    `מרכיבים: ${(recipe.ingredients || []).map(i => i.name).join(', ')}`,
-    `שלבים: ${(recipe.steps || []).map(s => s.text).join(' | ')}`,
+    `כותרת: ${safeRecipe.title}`,
+    `תיאור: ${safeRecipe.description}`,
+    `קטגוריה: ${safeRecipe.category}`,
+    `תגיות: ${safeTags.join(', ')}`,
+    `מרכיבים: ${safeRecipe.ingredients.map(i => i.name).join(', ')}`,
+    `שלבים: ${safeRecipe.steps.map(s => s.text).join(' | ')}`,
   ].join('\n')
 
   // Resolve an image for vision moderation: prefer uploaded base64, else fetch the final URL.
@@ -67,8 +98,8 @@ export default async function handler(req, res) {
     if (imageBase64) {
       imageBlock = { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageBase64 } }
       hadImage = true
-    } else if (image_url && /^https?:\/\//.test(image_url)) {
-      const imgRes = await fetch(image_url, { signal: AbortSignal.timeout(8000) })
+    } else if (safeImage) {
+      const imgRes = await fetch(safeImage, { signal: AbortSignal.timeout(8000) })
       if (imgRes.ok) {
         const buf = Buffer.from(await imgRes.arrayBuffer())
         if (buf.length < 4_500_000) { // keep request small
@@ -127,10 +158,10 @@ export default async function handler(req, res) {
 
     adminInsert('moderation_log', {
       user_id:          userId,
-      recipe_title:     recipe.title,
-      reason:           verdict.reason || '',
-      category:         verdict.category || 'other',
-      content_snapshot: { title: recipe.title, description: recipe.description, tags, category: recipe.category },
+      recipe_title:     safeRecipe.title,
+      reason:           clampStr(verdict.reason, 500),
+      category:         clampStr(verdict.category, 40) || 'other',
+      content_snapshot: { title: safeRecipe.title, description: safeRecipe.description, tags: safeTags, category: safeRecipe.category },
       had_image:        hadImage,
       strike_number:    strikeNumber,
     })
@@ -157,18 +188,18 @@ export default async function handler(req, res) {
   try {
     const created = await adminInsertReturning('recipes', {
       user_id:     userId,
-      title:       recipe.title,
-      description: recipe.description || '',
-      ingredients: recipe.ingredients || [],
-      steps:       recipe.steps || [],
-      prep_time:   recipe.prep_time || 0,
-      cook_time:   recipe.cook_time || 0,
-      servings:    recipe.servings || 2,
-      category:    recipe.category || 'אחר',
-      tags:        tags || [],
-      is_public:   isPublic !== false,
-      image_url:   image_url || null,
-      source_url:  source_url || null,
+      title:       safeRecipe.title,
+      description: safeRecipe.description,
+      ingredients: safeRecipe.ingredients,
+      steps:       safeRecipe.steps,
+      prep_time:   safeRecipe.prep_time,
+      cook_time:   safeRecipe.cook_time,
+      servings:    safeRecipe.servings,
+      category:    safeRecipe.category,
+      tags:        safeTags,
+      is_public:   isPublic === true, // private unless the user explicitly opted in
+      image_url:   safeImage,
+      source_url:  safeSource,
     })
     return res.status(200).json({ id: created.id })
   } catch (err) {
