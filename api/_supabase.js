@@ -5,11 +5,17 @@ const SUPABASE_URL      = process.env.VITE_SUPABASE_URL
 const SERVICE_ROLE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 function adminHeaders() {
-  return {
-    'Content-Type':  'application/json',
-    'apikey':        SERVICE_ROLE_KEY,
-    'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
+  const headers = {
+    'Content-Type': 'application/json',
+    'apikey':       SERVICE_ROLE_KEY,
   }
+  // Legacy keys are service_role JWTs: PostgREST reads the role from the Bearer
+  // token, so we must send it. New-format secret keys (sb_secret_…) are rejected
+  // when placed in Authorization — the role is derived from the apikey alone.
+  if (SERVICE_ROLE_KEY?.startsWith('eyJ')) {
+    headers.Authorization = `Bearer ${SERVICE_ROLE_KEY}`
+  }
+  return headers
 }
 
 // Insert a row (fire-and-forget, never throws)
