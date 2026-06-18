@@ -27,12 +27,18 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function loadProfile(userId) {
-    const { data } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle()
-    setProfile(data || null)
+    // Public profile fields live in `users`; sensitive fields (role/banned)
+    // live in `user_security`, readable only by the owner (and admins).
+    const [{ data: profileRow }, { data: securityRow }] = await Promise.all([
+      supabase.from('users').select('*').eq('id', userId).maybeSingle(),
+      supabase.from('user_security').select('role, banned').eq('id', userId).maybeSingle(),
+    ])
+    if (!profileRow && !securityRow) return setProfile(null)
+    setProfile({
+      ...(profileRow || { id: userId }),
+      role:   securityRow?.role   || 'user',
+      banned: securityRow?.banned || false,
+    })
   }
 
   async function refreshProfile() {

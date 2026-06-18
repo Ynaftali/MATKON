@@ -41,7 +41,7 @@ export default function AddRecipe() {
   const [recipe, setRecipe]       = useState(null)
   const [tags, setTags]           = useState([])
   const [newTag, setNewTag]       = useState('')
-  const [isPublic, setIsPublic]   = useState(true)
+  const [isPublic, setIsPublic]   = useState(false) // private by default — sharing is an explicit opt-in
   const [copied, setCopied]       = useState(false)
   const [saving, setSaving]         = useState(false)
   const [saveError, setSaveError]   = useState('')

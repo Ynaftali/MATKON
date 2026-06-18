@@ -41,9 +41,9 @@ export default async function handler(req, res) {
   if (!authUser?.id) return res.status(401).json({ error: 'unauthorized', message: 'נדרשת התחברות' })
   const userId = authUser.id
 
-  // ── Reject already-banned users ──
-  const [profile] = await adminSelect('users', `id=eq.${userId}&select=banned,strikes,role`)
-  if (profile?.banned) {
+  // ── Reject already-banned users (sensitive fields live in user_security) ──
+  const [security] = await adminSelect('user_security', `id=eq.${userId}&select=banned,strikes,role`)
+  if (security?.banned) {
     return res.status(403).json({ error: 'banned', message: 'החשבון נחסם עקב הפרות חוזרות.' })
   }
 
@@ -122,7 +122,7 @@ export default async function handler(req, res) {
 
   // ── Violation path: log, increment strikes, maybe ban ──
   if (!verdict.allowed) {
-    const strikeNumber = (profile?.strikes || 0) + 1
+    const strikeNumber = (security?.strikes || 0) + 1
     const willBan = strikeNumber >= STRIKES_TO_BAN
 
     adminInsert('moderation_log', {
@@ -136,7 +136,7 @@ export default async function handler(req, res) {
     })
 
     try {
-      await adminUpdate('users', `id=eq.${userId}`, {
+      await adminUpdate('user_security', `id=eq.${userId}`, {
         strikes: strikeNumber,
         ...(willBan ? { banned: true, banned_at: new Date().toISOString() } : {}),
       })
