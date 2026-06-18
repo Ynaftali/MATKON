@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IconHeart, IconMessageCircle, IconBookmark } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
@@ -73,6 +73,9 @@ export default function Recipes() {
   const [liked, setLiked]         = useState([])
   const [loading, setLoading]     = useState(true)
   const [communityCountry, setCommunityCountry] = useState(null) // null = all
+  const [commHasMore, setCommHasMore]       = useState(true)
+  const [commLoadingMore, setCommLoadingMore] = useState(false)
+  const commSentinelRef = useRef(null)
 
   // Set default community country to user's country
   useEffect(() => {
@@ -96,7 +99,7 @@ export default function Recipes() {
 
   // Reload community when tab changes to community or country changes
   useEffect(() => {
-    if (tab === 'community') loadCommunity()
+    if (tab === 'community') { setCommunity([]); setCommHasMore(true); loadCommunity(0, true) }
   }, [tab, communityCountry])
 
   async function loadMyRecipes(userId) {
@@ -110,8 +113,10 @@ export default function Recipes() {
     setLoading(false)
   }
 
-  const loadCommunity = useCallback(async () => {
-    setLoading(true)
+  const PAGE_SIZE = 12
+  const loadCommunity = useCallback(async (pageNum = 0, reset = false) => {
+    if (reset) setLoading(true); else setCommLoadingMore(true)
+    const from = pageNum * PAGE_SIZE
     let query = supabase
       .from('recipes')
       .select(`
@@ -122,7 +127,7 @@ export default function Recipes() {
       `)
       .eq('is_public', true)
       .order('created_at', { ascending: false })
-      .limit(40)
+      .range(from, from + PAGE_SIZE - 1)
 
     if (communityCountry) {
       // Filter by users who live in this country
@@ -130,9 +135,24 @@ export default function Recipes() {
     }
 
     const { data } = await query
-    setCommunity(data || [])
-    setLoading(false)
+    if (data) {
+      setCommunity(prev => reset ? data : [...prev, ...data])
+      setCommHasMore(data.length === PAGE_SIZE)
+    }
+    setLoading(false); setCommLoadingMore(false)
   }, [communityCountry])
+
+  // Infinite scroll for the community tab
+  useEffect(() => {
+    if (tab !== 'community' || !commHasMore || loading || commLoadingMore) return
+    const el = commSentinelRef.current
+    if (!el) return
+    const io = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) loadCommunity(Math.floor(community.length / PAGE_SIZE), false)
+    }, { rootMargin: '300px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [tab, commHasMore, loading, commLoadingMore, community.length, loadCommunity])
 
   async function loadSaved(userId) {
     const { data: savedRows } = await supabase
@@ -230,6 +250,8 @@ export default function Recipes() {
             {community.map(r => (
               <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`, { state: { recipe: r } })} />
             ))}
+            {!loading && commHasMore && <div ref={commSentinelRef} style={{ height: 1 }} />}
+            {commLoadingMore && <p style={{ textAlign:'center', padding:20, color:'var(--text-muted)', fontSize:'.85rem' }}>טוען עוד...</p>}
           </>
         )}
 

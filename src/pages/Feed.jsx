@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IconSearch, IconPlus, IconHeart, IconMessageCircle } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
@@ -39,15 +39,22 @@ function RecipeCard({ recipe, onClick }) {
   )
 }
 
+const PAGE_SIZE = 12
+
 export default function Feed() {
   const navigate = useNavigate()
   const [recipes, setRecipes] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
   const [search, setSearch]   = useState('')
   const [filter, setFilter]   = useState('הכל')
+  const sentinelRef = useRef(null)
 
-  const loadRecipes = useCallback(async () => {
-    setLoading(true)
+  // Load one page (range-based). reset=true replaces the list (filter change / first load).
+  const loadPage = useCallback(async (pageNum, reset) => {
+    if (reset) setLoading(true); else setLoadingMore(true)
+    const from = pageNum * PAGE_SIZE
     let query = supabase
       .from('recipes')
       .select(`
@@ -58,16 +65,35 @@ export default function Feed() {
       `)
       .eq('is_public', true)
       .order('created_at', { ascending: false })
-      .limit(40)
+      .range(from, from + PAGE_SIZE - 1)
 
     if (filter !== 'הכל') query = query.eq('category', filter)
 
     const { data, error } = await query
-if (!error && data) setRecipes(data)
-    setLoading(false)
+    if (!error && data) {
+      setRecipes(prev => reset ? data : [...prev, ...data])
+      setHasMore(data.length === PAGE_SIZE)
+    }
+    setLoading(false); setLoadingMore(false)
   }, [filter])
 
-  useEffect(() => { loadRecipes() }, [loadRecipes])
+  // Reset to the first page whenever the category filter changes.
+  useEffect(() => { setRecipes([]); setHasMore(true); loadPage(0, true) }, [loadPage])
+
+  // Infinite scroll: load the next page when the sentinel scrolls into view.
+  useEffect(() => {
+    if (!hasMore || loading || loadingMore || search) return
+    const el = sentinelRef.current
+    if (!el) return
+    const io = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) {
+        const nextPage = Math.floor(recipes.length / PAGE_SIZE)
+        loadPage(nextPage, false)
+      }
+    }, { rootMargin: '300px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [hasMore, loading, loadingMore, search, recipes.length, loadPage])
 
   const visible = search
     ? recipes.filter(r =>
@@ -117,6 +143,13 @@ if (!error && data) setRecipes(data)
         {visible.map(r => (
           <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`, { state: { recipe: r } })} />
         ))}
+
+        {!loading && !search && hasMore && (
+          <div ref={sentinelRef} style={{ height: 1 }} />
+        )}
+        {loadingMore && (
+          <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: '.85rem' }}>טוען עוד...</div>
+        )}
       </div>
 
       <button className="fab" onClick={() => navigate('/add')}>
