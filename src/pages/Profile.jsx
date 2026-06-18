@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconEdit, IconLock, IconShare, IconLogout, IconX } from '@tabler/icons-react'
+import { IconEdit, IconLock, IconShare, IconLogout, IconX, IconDownload, IconTrash } from '@tabler/icons-react'
 import { CATEGORY_GRADIENTS, countryFlag } from '../lib/mock'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
@@ -73,6 +73,9 @@ export default function Profile() {
   const [recipesLoading, setRecipesLoading] = useState(false)
   const [editOpen, setEditOpen]   = useState(false)
   const [toast, setToast]         = useState('')
+  const [privacyOpen, setPrivacyOpen] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
+  const [busy, setBusy]           = useState(false)
 
   useEffect(() => {
     if (!authLoading && !user) { navigate('/login'); return }
@@ -111,6 +114,53 @@ export default function Profile() {
   async function signOut() {
     await supabase.auth.signOut()
     navigate('/')
+  }
+
+  // ── GDPR self-service ──
+  async function exportData() {
+    setBusy(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ action: 'export' }),
+      })
+      if (!res.ok) throw new Error()
+      const data = await res.json()
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url  = URL.createObjectURL(blob)
+      const a    = document.createElement('a')
+      a.href = url
+      a.download = `matkon-data-${new Date().toISOString().slice(0,10)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setToast('שגיאה בייצוא הנתונים')
+      setTimeout(() => setToast(''), 2500)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function deleteAccount() {
+    if (confirmText !== 'מחיקה') return
+    setBusy(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ action: 'delete', confirm: confirmText }),
+      })
+      if (!res.ok) throw new Error()
+      await supabase.auth.signOut()
+      navigate('/')
+    } catch {
+      setBusy(false)
+      setToast('מחיקת החשבון נכשלה. נסו שוב.')
+      setTimeout(() => setToast(''), 2500)
+    }
   }
 
   if (authLoading || (user && !profile)) return (
@@ -219,7 +269,72 @@ export default function Profile() {
             <p>עדיין אין מתכונים שמורים</p>
           </div>
         )}
+
+        <button
+          onClick={() => { setPrivacyOpen(true); setConfirmText('') }}
+          style={{ width:'100%', marginTop:24, background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, fontSize:'.85rem' }}
+        >
+          <IconLock size={15} /> פרטיות ונתונים
+        </button>
       </div>
+
+      {privacyOpen && (
+        <div className="drawer-overlay" onClick={() => !busy && setPrivacyOpen(false)}>
+          <div className="drawer" onClick={e => e.stopPropagation()} style={{ maxHeight:'90vh', overflowY:'auto' }}>
+            <div className="drawer-header">
+              <span className="drawer-title">פרטיות ונתונים</span>
+              <button className="btn-icon" onClick={() => !busy && setPrivacyOpen(false)}><IconX size={18} /></button>
+            </div>
+            <div className="drawer-body" style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+              <div style={{ border:'1px solid var(--border)', borderRadius:12, padding:'14px 16px' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+                  <IconDownload size={20} style={{ color:'var(--text-muted)' }} />
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontWeight:600, fontSize:'.95rem' }}>ייצוא הנתונים שלי</div>
+                    <div style={{ fontSize:'.78rem', color:'var(--text-muted)' }}>הורדת כל המתכונים והפרטים כקובץ</div>
+                  </div>
+                </div>
+                <button className="btn btn-ghost btn-sm" style={{ width:'100%' }} onClick={exportData} disabled={busy}>
+                  {busy ? 'מעבד...' : 'הורדת קובץ נתונים'}
+                </button>
+              </div>
+
+              <div style={{ border:'1px solid var(--red)', borderRadius:12, padding:'14px 16px' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+                  <IconTrash size={20} style={{ color:'var(--red)' }} />
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontWeight:600, fontSize:'.95rem', color:'var(--red)' }}>מחיקת החשבון</div>
+                    <div style={{ fontSize:'.78rem', color:'var(--text-muted)' }}>מחיקה מלאה ובלתי הפיכה של כל הנתונים</div>
+                  </div>
+                </div>
+                <div style={{ background:'rgba(229,72,77,.12)', borderRadius:8, padding:'10px 12px', fontSize:'.78rem', color:'var(--red)', lineHeight:1.6, marginBottom:10 }}>
+                  פעולה זו תמחק לצמיתות את החשבון, כל המתכונים, הלייקים והתגובות. לא ניתן לשחזר.
+                </div>
+                <div style={{ fontSize:'.78rem', color:'var(--text-muted)', marginBottom:4 }}>
+                  להמשך, הקלידו: <strong>מחיקה</strong>
+                </div>
+                <input
+                  className="input"
+                  placeholder="מחיקה"
+                  value={confirmText}
+                  onChange={e => setConfirmText(e.target.value)}
+                  style={{ marginBottom:10 }}
+                />
+                <button
+                  className="btn btn-sm"
+                  style={{ width:'100%', borderColor:'var(--red)', color:'var(--red)', opacity: confirmText==='מחיקה' && !busy ? 1 : .5 }}
+                  onClick={deleteAccount}
+                  disabled={confirmText!=='מחיקה' || busy}
+                >
+                  {busy ? 'מוחק...' : 'מחיקת החשבון לצמיתות'}
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
 
       {editOpen && (
         <EditModal

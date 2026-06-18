@@ -72,6 +72,44 @@ export async function adminSelect(table, filter) {
   } catch { return [] }
 }
 
+// Delete rows matching a PostgREST filter, e.g. adminDelete('recipes', 'user_id=eq.xxx')
+export async function adminDelete(table, filter) {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${filter}`, {
+    method:  'DELETE',
+    headers: { ...adminHeaders(), Prefer: 'return=minimal' },
+  })
+  if (!res.ok) throw new Error(`delete ${table} failed: ${res.status} ${await res.text()}`)
+}
+
+// Permanently delete a user from auth.users (admin endpoint, service role only)
+export async function deleteAuthUser(userId) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
+    method:  'DELETE',
+    headers: adminHeaders(),
+  })
+  if (!res.ok && res.status !== 404) throw new Error(`delete auth user failed: ${res.status} ${await res.text()}`)
+}
+
+// Remove every object under a storage prefix (e.g. a user's folder). Never throws.
+export async function deleteStoragePrefix(bucket, prefix) {
+  try {
+    const listRes = await fetch(`${SUPABASE_URL}/storage/v1/object/list/${bucket}`, {
+      method:  'POST',
+      headers: adminHeaders(),
+      body:    JSON.stringify({ prefix, limit: 1000 }),
+    })
+    if (!listRes.ok) return
+    const files = await listRes.json()
+    const paths = (files || []).map(f => `${prefix}/${f.name}`)
+    if (!paths.length) return
+    await fetch(`${SUPABASE_URL}/storage/v1/object/${bucket}`, {
+      method:  'DELETE',
+      headers: adminHeaders(),
+      body:    JSON.stringify({ prefixes: paths }),
+    })
+  } catch {}
+}
+
 // Verify a Supabase access token and return the authenticated user, or null.
 // Never trust a userId from the request body — always derive identity from the token.
 export async function getUserFromToken(authHeader) {
