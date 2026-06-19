@@ -76,6 +76,13 @@ export default async function handler(req, res) {
     if (safeImage)  patch.image_url  = safeImage
     if (safeSource) patch.source_url = safeSource
     await adminUpdate('recipes', `id=eq.${id}`, patch)
+    // Count a new AI image generation when the edit replaced the image with one.
+    if (safeImage && safeImage !== existing.image_url && safeImage.includes('pollinations.ai')) {
+      adminInsert('usage_log', {
+        user_id: userId, endpoint: 'generate-image', model: 'pollinations-flux',
+        input_tokens: 0, output_tokens: 0, cost_usd: 0,
+      })
+    }
     return res.status(200).json({ id })
   } catch (err) {
     console.error('update recipe error:', err)

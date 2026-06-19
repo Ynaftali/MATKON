@@ -59,6 +59,14 @@ export default async function handler(req, res) {
       image_url:   safeImage,
       source_url:  safeSource,
     })
+    // Count AI image generations (Pollinations) for the resources dashboard.
+    // Free today, but tracked so usage can be quantified before moving to a paid model.
+    if (safeImage && safeImage.includes('pollinations.ai')) {
+      adminInsert('usage_log', {
+        user_id: userId, endpoint: 'generate-image', model: 'pollinations-flux',
+        input_tokens: 0, output_tokens: 0, cost_usd: 0,
+      })
+    }
     return res.status(200).json({ id: created.id })
   } catch (err) {
     console.error('publish insert error:', err)

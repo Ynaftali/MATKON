@@ -174,12 +174,19 @@ export default function RecipePage() {
     setLikeLoading(false)
   }
 
+  function logShare(channel) {
+    // Fire-and-forget: feeds the popularity ranking (likes + distinct sharers).
+    if (!currentUser?.id) return
+    supabase.from('recipe_shares').insert({ recipe_id: id, user_id: currentUser.id, channel }).then(() => {}, () => {})
+  }
+
   async function handleShare() {
     const url = `https://matkon.co/recipe/${id}`
     if (navigator.share) {
-      try { await navigator.share({ title: recipe.title, text: recipe.description, url }) } catch {}
+      try { await navigator.share({ title: recipe.title, text: recipe.description, url }); logShare('native') } catch {}
     } else {
       await navigator.clipboard.writeText(url)
+      logShare('copy')
       showToast('הקישור הועתק ✓')
     }
   }
