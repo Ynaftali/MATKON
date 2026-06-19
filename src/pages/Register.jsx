@@ -130,7 +130,7 @@ export default function Register() {
         </button>
 
         <p style={{ textAlign:'center', fontSize:'.8rem', color:'var(--text-muted)', marginTop:-4 }}>
-          בהרשמה אתם מסכימים ל<a onClick={() => navigate('/terms')} style={{ color:'var(--blue-light)', cursor:'pointer' }}>תנאי השימוש</a>
+          בהרשמה אתם מסכימים ל<a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color:'var(--blue-light)' }}>תנאי השימוש</a>
         </p>
 
         <div className="auth-divider">או הירשמו עם</div>

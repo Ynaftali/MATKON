@@ -69,7 +69,7 @@ export default function SSOCountry() {
           <input type="checkbox" checked={tos} onChange={e => setTos(e.target.checked)} style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }} />
           <span style={{ fontSize: '.82rem', lineHeight: 1.55, color: 'var(--text-2)' }}>
             קראתי ואני מאשר/ת את{' '}
-            <a onClick={e => { e.preventDefault(); navigate('/terms') }} style={{ color: 'var(--blue-light)', textDecoration: 'underline', cursor: 'pointer' }}>
+            <a href="/terms" target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: 'var(--blue-light)', textDecoration: 'underline' }}>
               תנאי השימוש
             </a>{' '}
             ומדיניות הפרטיות
