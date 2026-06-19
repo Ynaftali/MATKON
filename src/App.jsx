@@ -66,7 +66,6 @@ import VerifyEmail     from './pages/VerifyEmail'
 import Terms          from './pages/Terms'
 import Shopping       from './pages/Shopping'
 import Blocked        from './pages/Blocked'
-import AdminDashboard from './pages/AdminDashboard'
 
 export default function App() {
   return (
@@ -94,7 +93,6 @@ export default function App() {
         <Route path="/terms"               element={<Terms />}        />
         <Route path="/shopping"            element={<Shopping />}     />
         <Route path="/blocked"             element={<Blocked />}      />
-        <Route path="/admin"               element={<AdminDashboard />} />
         <Route path="*"                    element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>

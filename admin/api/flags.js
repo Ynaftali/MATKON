@@ -1,10 +1,8 @@
-import { requireCapability } from '../_admin.js'
-import { adminRpc } from '../_supabase.js'
+import { requireCapability } from './_admin.js'
+import { adminRpc } from './_supabase.js'
 
 export const config = { runtime: 'nodejs' }
 
-// Red flags: content moderation hits, problematic users, recent AI spend.
-// Read-only; gated on the flags.view capability (moderators included).
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 

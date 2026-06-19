@@ -60,19 +60,6 @@ export async function adminUpdate(table, filter, patch) {
   return res.json()
 }
 
-// Call a Postgres function (RPC) with the service role. Returns parsed JSON or null.
-// EXECUTE is revoked from anon/authenticated, so these are reachable only here.
-export async function adminRpc(fn, args = {}) {
-  if (!SERVICE_ROLE_KEY) return null
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
-    method:  'POST',
-    headers: adminHeaders(),
-    body:    JSON.stringify(args),
-  })
-  if (!res.ok) throw new Error(`rpc ${fn} failed: ${res.status} ${await res.text()}`)
-  return res.json()
-}
-
 // Select rows matching a PostgREST filter, returns array (never throws)
 export async function adminSelect(table, filter) {
   if (!SERVICE_ROLE_KEY) return []

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconEdit, IconLock, IconShare, IconLogout, IconX, IconDownload, IconTrash, IconShieldLock } from '@tabler/icons-react'
+import { IconEdit, IconLock, IconShare, IconLogout, IconX, IconDownload, IconTrash } from '@tabler/icons-react'
 import { CATEGORY_GRADIENTS, countryFlag } from '../lib/mock'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
@@ -203,16 +203,6 @@ export default function Profile() {
         >
           <IconEdit size={14} /> עריכת פרופיל
         </button>
-
-        {['admin', 'moderator'].includes(profile?.role) && (
-          <button
-            className="btn btn-outline btn-sm"
-            style={{ width: 'auto', marginTop: 8 }}
-            onClick={() => navigate('/admin')}
-          >
-            <IconShieldLock size={14} /> לוח ניהול
-          </button>
-        )}
 
         <div className="profile-stats">
           {[

@@ -1,16 +1,11 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
 import {
-  IconArrowRight, IconUsers, IconBook, IconWorld, IconCoin,
+  IconLogout, IconUsers, IconBook, IconWorld, IconCoin,
   IconFlag, IconAlertTriangle, IconShieldLock, IconActivity,
 } from '@tabler/icons-react'
-import { supabase } from '../lib/supabase'
-import { useAuth } from '../lib/AuthContext'
-import { countryFlag } from '../lib/mock'
+import { supabase } from './lib/supabase'
+import { countryFlag } from './lib/flags'
 
-const ADMIN_ROLES = ['admin', 'moderator']
-
-// Friendly Hebrew names for each AI feature that writes to usage_log.
 const ENDPOINT_LABELS = {
   'parse-recipe':          'זיהוי מתכון',
   'translate-ingredients': 'תרגום מצרכים',
@@ -19,15 +14,19 @@ const ENDPOINT_LABELS = {
 }
 const endpointLabel = e => ENDPOINT_LABELS[e] || e
 
+const ROLE_LABELS = {
+  super_admin: 'מנהל-על',
+  admin:       'מנהל מערכת',
+  moderator:   'מנהל תוכן',
+}
+
 const fmtNum  = n => new Intl.NumberFormat('he-IL').format(n ?? 0)
 const fmtUsd  = n => `$${Number(n ?? 0).toFixed(4)}`
 const fmtDate = s => s ? new Date(s).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: '2-digit' }) : ''
 
 async function authedGet(path) {
   const { data: { session } } = await supabase.auth.getSession()
-  const res = await fetch(path, {
-    headers: { Authorization: `Bearer ${session?.access_token || ''}` },
-  })
+  const res = await fetch(path, { headers: { Authorization: `Bearer ${session?.access_token || ''}` } })
   if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.message || 'שגיאה')
   return res.json()
 }
@@ -69,22 +68,17 @@ function BarList({ rows, labelKey, valueKey, accent }) {
   )
 }
 
-export default function AdminDashboard() {
-  const { profile, loading } = useAuth()
-  const navigate = useNavigate()
+export default function Dashboard({ profile, onLogout }) {
   const [stats, setStats] = useState(null)
   const [flags, setFlags] = useState(null)
   const [error, setError] = useState('')
   const [busy,  setBusy]  = useState(true)
 
-  const isAdmin = ADMIN_ROLES.includes(profile?.role)
-
   useEffect(() => {
-    if (loading || !isAdmin) return
     let alive = true
     ;(async () => {
       try {
-        const [s, f] = await Promise.all([authedGet('/api/admin/stats'), authedGet('/api/admin/flags')])
+        const [s, f] = await Promise.all([authedGet('/api/stats'), authedGet('/api/flags')])
         if (!alive) return
         setStats(s); setFlags(f)
       } catch (e) {
@@ -94,29 +88,20 @@ export default function AdminDashboard() {
       }
     })()
     return () => { alive = false }
-  }, [loading, isAdmin])
+  }, [])
 
-  // Auth gate — wait for profile, then bounce non-admins.
-  if (loading) return <div className="adm-center">טוענים...</div>
-  if (!profile) return <Navigate to="/login" replace />
-  if (!isAdmin) return <Navigate to="/feed" replace />
-
-  const flagsArr   = flags?.content_flags || []
-  const problems   = flags?.problem_users || []
-  const aiUsage    = flags?.ai_usage_recent || []
+  const flagsArr = flags?.content_flags || []
+  const problems = flags?.problem_users || []
+  const aiUsage  = flags?.ai_usage_recent || []
 
   return (
     <div className="adm-page">
       <header className="adm-header">
-        <button className="btn-icon" onClick={() => navigate('/feed')} aria-label="חזרה">
-          <IconArrowRight size={18} />
-        </button>
-        <div>
+        <div style={{ flex: 1 }}>
           <h1 className="adm-title">לוח ניהול</h1>
-          <span className="adm-role">
-            {profile.full_name || 'אדמין'} · {profile.role === 'admin' ? 'מנהל מערכת' : 'מנהל תוכן'}
-          </span>
+          <span className="adm-role">{profile.email} · {ROLE_LABELS[profile.role] || profile.role}</span>
         </div>
+        <button className="btn-icon" onClick={onLogout} aria-label="יציאה"><IconLogout size={18} /></button>
       </header>
 
       {busy && <div className="adm-center">טוענים נתונים...</div>}
@@ -133,7 +118,6 @@ export default function AdminDashboard() {
             <StatCard icon={<IconShieldLock size={20} />} label="חסומים"           value={fmtNum(stats.banned_users)}     accent={stats.banned_users ? 'var(--red)' : '#a89ad0'} />
           </div>
 
-          {/* Resources & AI cost — kept together in one prominent block (critical) */}
           <section className="adm-resources">
             <h2 className="adm-section-title"><IconCoin size={18} /> משאבים ועלויות AI</h2>
             <div className="adm-res-figures">
@@ -187,9 +171,7 @@ export default function AdminDashboard() {
           {stats.top_tags?.length > 0 && (
             <Section title="תגיות מובילות" icon={<IconFlag size={18} />}>
               <div className="adm-tags">
-                {stats.top_tags.map(t => (
-                  <span key={t.tag} className="adm-tag">{t.tag} <b>{fmtNum(t.n)}</b></span>
-                ))}
+                {stats.top_tags.map(t => <span key={t.tag} className="adm-tag">{t.tag} <b>{fmtNum(t.n)}</b></span>)}
               </div>
             </Section>
           )}
@@ -205,9 +187,7 @@ export default function AdminDashboard() {
                       {f.recipe_title || '(ללא כותרת)'}
                       <span className="adm-cat">{f.category}{f.had_image ? ' · תמונה' : ''}</span>
                     </div>
-                    <span className="adm-list-meta">
-                      {f.full_name || 'משתמש'} · {fmtDate(f.created_at)}
-                    </span>
+                    <span className="adm-list-meta">{f.full_name || 'משתמש'} · {fmtDate(f.created_at)}</span>
                   </div>
                 ))}
               </div>

@@ -1,9 +1,8 @@
-import { requireCapability } from '../_admin.js'
-import { adminRpc } from '../_supabase.js'
+import { requireCapability } from './_admin.js'
+import { adminRpc } from './_supabase.js'
 
 export const config = { runtime: 'nodejs' }
 
-// Aggregate dashboard statistics. Read-only; gated on the stats.view capability.
 export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' })
 
