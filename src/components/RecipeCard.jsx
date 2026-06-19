@@ -18,7 +18,6 @@ export default function RecipeCard({ recipe }) {
         )}
         <div className="recipe-card-footer">
           <div className="recipe-author">
-            {user.avatar_url && <img src={user.avatar_url} alt="" className="avatar" />}
             <span>{user.full_name || 'אנונימי'}</span>
             {user.country && <span className="author-country">📍 {user.country}</span>}
           </div>
