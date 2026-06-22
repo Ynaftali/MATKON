@@ -91,12 +91,23 @@ export default function App() {
   }, [session, logout])
 
   if (session === undefined) return <div className="adm-center">טוענים...</div>
-  if (recovery) return (
-    <SetPassword
-      onDone={() => { window.location.hash = ''; setRecovery(false); refreshAal() }}
-      onLogout={() => { window.location.hash = ''; setRecovery(false); logout() }}
-    />
-  )
+  if (recovery) {
+    // Recovery/invite links establish an aal1 session. If the account already
+    // has MFA enrolled, Supabase requires aal2 to change the password (PUT /user
+    // returns insufficient_aal otherwise), so step up through the MFA gate first
+    // and only then show the set-password screen.
+    const exitRecovery = () => { window.location.hash = ''; setRecovery(false) }
+    if (!session || !aal) return <div className="adm-center">טוענים...</div>
+    if (aal.currentLevel !== 'aal2' && aal.nextLevel === 'aal2') {
+      return <MfaGate onVerified={refreshAal} onLogout={() => { exitRecovery(); logout() }} />
+    }
+    return (
+      <SetPassword
+        onDone={() => { exitRecovery(); refreshAal() }}
+        onLogout={() => { exitRecovery(); logout() }}
+      />
+    )
+  }
   if (!session) return <AdminLogin />
   if (aal?.currentLevel !== 'aal2') return <MfaGate onVerified={refreshAal} onLogout={logout} />
   if (profile === undefined) return <div className="adm-center">טוענים...</div>
