@@ -1,0 +1,24 @@
+-- Fix infinite recursion in user_security RLS policies.
+--
+-- The `user_security_admin_read` SELECT policy referenced user_security inside
+-- its own USING clause (a subquery on the same table). PostgreSQL evaluates RLS
+-- policies when querying the table, so this caused
+--   ERROR: infinite recursion detected in policy for relation "user_security"
+-- on EVERY select against the table. The admin app's role lookup
+-- (App.jsx self-read of user_security) swallows the query error and falls back
+-- to role='user', which made a valid super_admin appear to have no admin
+-- permission. For normal users that same fallback happened to match their real
+-- role, so the bug stayed dormant until the first admin login.
+--
+-- Cross-user reads of user_security (e.g. the dashboard) are performed
+-- server-side via SECURITY DEFINER RPCs using the service role, which bypass
+-- RLS, so a client-side admin read policy is unnecessary. Drop the recursive
+-- policy; the non-recursive `user_security_self_read` (auth.uid() = id) remains
+-- and is sufficient for each account to read its own role/banned flag.
+--
+-- If a future phase needs client-side cross-user reads, add a SECURITY DEFINER
+-- helper (e.g. is_staff(uid)) and reference that instead of subquerying the
+-- table directly. The dropped policy was also functionally wrong: it only
+-- matched role = 'admin', omitting 'super_admin' and 'moderator'.
+
+drop policy if exists user_security_admin_read on public.user_security;
