@@ -1,4 +1,5 @@
-import { adminInsert, adminCount } from './_supabase.js'
+import { adminInsert, adminCount, adminSelect, getUserFromToken } from './_supabase.js'
+import { moderateRawInput, recordViolation, hashContent, clampStr } from './_moderation.js'
 
 export const config = { runtime: 'nodejs' }
 
@@ -11,13 +12,17 @@ const COST_PER_OUTPUT_TOKEN = 0.000004
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const { text, url, imageBase64, userId } = req.body || {}
+  // Identity is derived from the token, never from the body — a strike must be
+  // attributable to the real account that submitted the content.
+  const authUser = await getUserFromToken(req.headers.authorization)
+  const userId = authUser?.id || null
+  const { text, url, imageBase64 } = req.body || {}
 
   if (!text && !url && !imageBase64) {
     return res.status(400).json({ error: 'נדרש טקסט, לינק או תמונה' })
   }
 
-  // ── Rate limiting ────────────────────────────────────
+  // ── Rate limiting (per authenticated user) ───────────
   if (userId) {
     const oneHourAgo = new Date(Date.now() - 3600_000).toISOString()
     const count = await adminCount(
@@ -26,6 +31,34 @@ export default async function handler(req, res) {
     )
     if (count >= RATE_LIMIT_PER_HOUR) {
       return res.status(429).json({ error: 'הגעתם למגבלת השימוש. נסו שוב בעוד שעה.' })
+    }
+  }
+
+  // ── Gate 1: moderate the RAW user input before the AI rewrite or any image
+  // work, so bad content is stopped early and the user is judged only on what
+  // they actually submitted. Skipped for link input (a URL isn't user-authored
+  // content — that recipe is moderated at publish, gate 2).
+  if (userId && (text || imageBase64)) {
+    const [security] = await adminSelect(
+      'user_security',
+      `id=eq.${userId}&select=banned,strikes,junk_strikes,role`
+    )
+    if (security?.banned) {
+      return res.status(403).json({ error: 'banned', banned: true, banReason: 'abuse', message: 'החשבון נחסם עקב הפרות חוזרות.' })
+    }
+    const mod = await moderateRawInput({ rawText: text, imageBase64, userId })
+    if (!mod.ok) {
+      return res.status(503).json({ error: 'moderation_unavailable', message: 'בדיקת התוכן אינה זמינה כעת. נסו שוב.' })
+    }
+    if (!mod.verdict.allowed) {
+      const body = await recordViolation({
+        userId, security, verdict: mod.verdict, hadImage: mod.hadImage,
+        contentHash: hashContent(text || imageBase64 || ''),
+        recipeTitle:  clampStr(text, 200) || '(קלט גולמי)',
+        snapshot:     { raw: text ? clampStr(text, 1000) : '(תמונה)' },
+        counts:       true, // gate 1 counts both abuse and junk
+      })
+      return res.status(422).json(body)
     }
   }
 
@@ -94,6 +127,7 @@ export default async function handler(req, res) {
 כללים:
 - החזר JSON בלבד, ללא טקסט נוסף
 - תרגם לעברית אם הטקסט באנגלית
+- description: תיאור עובדתי וקצר (1-2 משפטים) המבוסס אך ורק על המתכון שנמסר. אל תמציא תוכן, אל תוסיף הומור, סגנון יצירתי, או "מרכיבים" שלא נמסרו (כמו "כעס" או "אהבה"). היצמד למה שהמשתמש כתב.
 - אם חסר מידע, השתמש בערכי ברירת מחדל הגיוניים
 - tags: בחר 2-4 תגיות רלוונטיות
 - level: קל / בינוני / מתקדם

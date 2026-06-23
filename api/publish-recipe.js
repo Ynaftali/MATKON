@@ -1,9 +1,13 @@
 import {
-  adminInsert, adminInsertReturning, adminUpdate, adminSelect, getUserFromToken,
+  adminInsert, adminInsertReturning, adminSelect, adminCount, getUserFromToken,
 } from './_supabase.js'
-import { sanitizeRecipe, moderateRecipe, recordViolation } from './_moderation.js'
+import { sanitizeRecipe, moderateRecipe, recordViolation, recipeContentHash } from './_moderation.js'
 
 export const config = { runtime: 'nodejs' }
+
+// Anti-flood: even non-abusive recipes are capped per user per day. The soft
+// alert at 10/day lives in the admin dashboard; this is the hard publish stop.
+const DAILY_PUBLISH_CAP = 20
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -14,9 +18,16 @@ export default async function handler(req, res) {
   const userId = authUser.id
 
   // ── Reject already-banned users (sensitive fields live in user_security) ──
-  const [security] = await adminSelect('user_security', `id=eq.${userId}&select=banned,strikes,role`)
+  const [security] = await adminSelect('user_security', `id=eq.${userId}&select=banned,strikes,junk_strikes,role`)
   if (security?.banned) {
-    return res.status(403).json({ error: 'banned', message: 'החשבון נחסם עקב הפרות חוזרות.' })
+    return res.status(403).json({ error: 'banned', banned: true, banReason: 'abuse', message: 'החשבון נחסם עקב הפרות חוזרות.' })
+  }
+
+  // ── Daily publish cap (anti-flood) ──
+  const since = new Date(Date.now() - 24 * 3600_000).toISOString()
+  const publishedToday = await adminCount('recipes', `user_id=eq.${userId}&created_at=gte.${since}`)
+  if (publishedToday >= DAILY_PUBLISH_CAP) {
+    return res.status(429).json({ error: 'daily_cap', message: `הגעתם לתקרת הפרסום היומית (${DAILY_PUBLISH_CAP} מתכונים). נסו שוב מחר.` })
   }
 
   const { recipe, tags, isPublic, image_url, source_url, imageBase64 } = req.body || {}
@@ -33,11 +44,16 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'moderation_unavailable', message: 'בדיקת התוכן אינה זמינה כעת. נסו שוב.' })
   }
 
-  // ── Violation path: log, increment strikes, maybe ban ──
+  // ── Violation path. Gate 2 is a backstop: abuse still strikes (with dedup, to
+  // catch a malicious edit made after the recipe was parsed), but junk here is an
+  // AI-output / quality issue — block, never penalize the user. ──
   if (!mod.verdict.allowed) {
     const body = await recordViolation({
-      adminInsert, adminUpdate, userId, security,
-      safeRecipe, safeTags, verdict: mod.verdict, hadImage: mod.hadImage,
+      userId, security, verdict: mod.verdict, hadImage: mod.hadImage,
+      contentHash: recipeContentHash({ safeRecipe, safeTags }),
+      recipeTitle: safeRecipe.title,
+      snapshot: { title: safeRecipe.title, description: safeRecipe.description, tags: safeTags, category: safeRecipe.category },
+      counts: mod.verdict.kind === 'abuse',
     })
     return res.status(422).json(body)
   }

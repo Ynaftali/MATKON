@@ -1,10 +1,19 @@
 import { IconLock, IconMail } from '@tabler/icons-react'
+import { useSearchParams } from 'react-router-dom'
 
-// Shown to users whose account was banned after repeated content violations.
-// Contact goes to a dedicated support address — no personal/internal details exposed.
+// Shown to users whose account was banned. The wording differs by reason — repeated
+// offensive content (abuse) vs. repeated non-recipe content (junk) — but neither
+// exposes personal/internal details. Contact goes to a dedicated support address.
 const SUPPORT_EMAIL = 'support@matkon.co'
 
 export default function Blocked() {
+  const [params] = useSearchParams()
+  const junk = params.get('reason') === 'junk'
+
+  const lead = junk
+    ? 'זיהינו ניסיונות חוזרים להעלות תוכן שאינו מתכון. הגישה לאפליקציה הושעתה.'
+    : 'זיהינו הפרות חוזרות של כללי הקהילה. הגישה לאפליקציה הושעתה.'
+
   const subject = encodeURIComponent('פנייה בנוגע לחסימת חשבון')
   const body    = encodeURIComponent('שלום,\n\nברצוני לערער על חסימת החשבון שלי.\n\n')
 
@@ -16,10 +25,10 @@ export default function Blocked() {
         </div>
         <h1 style={{ fontSize: '1.3rem', margin: 0 }}>החשבון נחסם</h1>
         <p style={{ fontSize: '.95rem', color: 'var(--text-2)', lineHeight: 1.7, margin: 0 }}>
-          זיהינו הפרות חוזרות של כללי הקהילה. הגישה לאפליקציה הושעתה.
+          {lead}
         </p>
         <p style={{ fontSize: '.85rem', color: 'var(--text-muted)', lineHeight: 1.7, margin: 0 }}>
-          אם לדעתך מדובר בטעות, אפשר לפנות אלינו ונבחן את הפנייה.
+          אם לדעתכם מדובר בטעות, אפשר לפנות אלינו ונבחן את הפנייה.
         </p>
         <a
           className="btn btn-primary"

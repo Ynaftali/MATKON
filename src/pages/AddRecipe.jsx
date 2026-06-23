@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
-import { IconChevronRight, IconFlame, IconPencil, IconLink, IconCamera, IconPlus, IconX, IconLock, IconWorld, IconBrandWhatsapp, IconBrandInstagram, IconBrandFacebook, IconCopy } from '@tabler/icons-react'
+import { IconChevronRight, IconFlame, IconPencil, IconLink, IconCamera, IconPlus, IconX, IconLock, IconWorld, IconBrandWhatsapp, IconBrandInstagram, IconBrandFacebook, IconCopy, IconShieldX, IconHelpCircle, IconEdit, IconHome } from '@tabler/icons-react'
 import { compressImage } from '../lib/compressImage'
 
 const AI_STEPS = [
@@ -28,6 +28,41 @@ function StepDots({ current }) {
   )
 }
 
+// Shown when moderation rejects a recipe (not a ban). Differentiates abuse
+// (red, quotes the offending phrase so an accidental mistake can be fixed) from
+// junk (amber, "not a recipe"). Lets the user fix-and-retry or go home.
+function BlockCard({ info, onEdit, onHome }) {
+  const abuse = info.kind === 'abuse'
+  const accent = abuse ? 'var(--red)' : '#ef9f27'
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:50, background:'rgba(8,13,28,.78)', display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}>
+      <div style={{ maxWidth:380, width:'100%', background:'var(--bg-card)', border:`1px solid ${abuse ? 'rgba(224,82,82,.35)' : 'rgba(239,159,39,.35)'}`, borderRadius:16, padding:20 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8, color:accent, fontWeight:700, fontSize:'1rem', marginBottom:10 }}>
+          {abuse ? <IconShieldX size={20} /> : <IconHelpCircle size={20} />}
+          {abuse ? 'המתכון לא פורסם' : 'לא זיהינו מתכון'}
+        </div>
+        <p style={{ color:'var(--text-2)', fontSize:'.9rem', lineHeight:1.6, margin:'0 0 10px' }}>{info.message}</p>
+        {abuse && info.quote && (
+          <div style={{ background:'rgba(224,82,82,.12)', borderRight:`3px solid var(--red)`, borderRadius:6, padding:'8px 10px', color:'var(--text)', fontSize:'.9rem', fontStyle:'italic', lineHeight:1.5, margin:'0 0 10px' }}>
+            "{info.quote}"
+          </div>
+        )}
+        {info.warning && (
+          <p style={{ color:accent, fontSize:'.82rem', lineHeight:1.6, margin:'0 0 12px' }}>{info.warning}</p>
+        )}
+        <div style={{ display:'flex', gap:10, marginTop:6 }}>
+          <button className="btn btn-primary" style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }} onClick={onEdit}>
+            <IconEdit size={16} /> עריכה ותיקון
+          </button>
+          <button className="btn btn-ghost" style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6 }} onClick={onHome}>
+            <IconHome size={16} /> לעמוד הראשי
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function AddRecipe() {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -46,12 +81,31 @@ export default function AddRecipe() {
   const [saving, setSaving]         = useState(false)
   const [saveError, setSaveError]   = useState('')
   const [savedId, setSavedId]       = useState(null)
+  const [parsing, setParsing]       = useState(false)
+  const [blockInfo, setBlockInfo]   = useState(null) // moderation block details (abuse/junk)
   const [recipeImageFile, setRecipeImageFile] = useState(null)
   const [recipeImagePreview, setRecipeImagePreview] = useState(null)
   const fileRef     = useRef()
   const recipeImgRef = useRef()
 
+  // Route a moderation response (banned → blocked screen, rejected → block card).
+  // Returns true if it handled the response, false otherwise.
+  function handleModerationResponse(body) {
+    if (body?.banned) {
+      navigate(`/blocked?reason=${body.banReason || 'abuse'}`)
+      return true
+    }
+    if (body?.error === 'rejected') {
+      setBlockInfo(body)
+      return true
+    }
+    return false
+  }
+
   async function runAI() {
+    if (parsing) return
+    setParsing(true)
+    setBlockInfo(null)
     setStep(2)
     setAiStep(0)
     setAiError('')
@@ -68,10 +122,14 @@ export default function AddRecipe() {
                    inputType === 'photo' ? { imageBase64 } :
                    { text }
 
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/api/parse-recipe', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...body, userId: user?.id }),
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
+        },
+        body: JSON.stringify(body),
       })
       const data = await res.json()
 
@@ -79,6 +137,8 @@ export default function AddRecipe() {
       setAiStep(AI_STEPS.length - 1)
 
       if (!res.ok) {
+        // Gate 1 block (banned / rejected) gets the rich block card; otherwise plain error.
+        if (handleModerationResponse(data)) { setStep(1); return }
         setAiError(data.message || data.error || 'שגיאה לא ידועה')
         setStep(1)
         return
@@ -91,12 +151,15 @@ export default function AddRecipe() {
       clearInterval(interval)
       setAiError('בעיית תקשורת — נסה שוב')
       setStep(1)
+    } finally {
+      setParsing(false)
     }
   }
 
   async function saveRecipe() {
     setSaving(true)
     setSaveError('')
+    setBlockInfo(null)
 
     if (!user) {
       navigate('/login')
@@ -190,25 +253,29 @@ export default function AddRecipe() {
       return
     }
 
-    // Banned → bounce to the blocked screen
-    if (result.body?.banned) {
-      navigate('/blocked')
-      return
-    }
+    // Banned → blocked screen; rejected → rich block card.
+    if (handleModerationResponse(result.body)) return
 
-    // Rejected by moderation or other error
+    // Any other error
     setSaveError(result.body?.message || result.body?.reason || 'שגיאה בשמירת המתכון')
   }
 
-  function handleImageUpload(e) {
+  async function handleImageUpload(e) {
     const file = e.target.files[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = ev => {
-      // Strip data:image/...;base64, prefix
-      setImageBase64(ev.target.result.split(',')[1])
+    const toBase64 = f => {
+      const reader = new FileReader()
+      reader.onload = ev => setImageBase64(ev.target.result.split(',')[1]) // strip data:...;base64, prefix
+      reader.readAsDataURL(f)
     }
-    reader.readAsDataURL(file)
+    try {
+      // Normalize to a bounded JPEG: iOS screenshots are PNG and full-size, which
+      // breaks the vision call (wrong media_type / too large). Compress first so
+      // both parse-recipe and the gate-1 moderator get a valid 'image/jpeg'.
+      toBase64(await compressImage(file))
+    } catch {
+      toBase64(file) // fall back to the original if the canvas pipeline fails
+    }
   }
 
   function addTag() {
@@ -227,6 +294,13 @@ export default function AddRecipe() {
 
   return (
     <div className="add-page">
+      {blockInfo && (
+        <BlockCard
+          info={blockInfo}
+          onEdit={() => setBlockInfo(null)}
+          onHome={() => navigate('/feed')}
+        />
+      )}
       <div className="topbar">
         <button className="btn-icon" onClick={() => step > 1 ? setStep(s => s-1) : navigate(-1)}>
           <IconChevronRight size={20} />
@@ -283,6 +357,7 @@ export default function AddRecipe() {
             className="btn btn-primary"
             onClick={runAI}
             disabled={
+              parsing ||
               (inputType === 'text'  && !text.trim()) ||
               (inputType === 'link'  && !url.trim())  ||
               (inputType === 'photo' && !imageBase64)

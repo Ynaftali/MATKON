@@ -1,7 +1,7 @@
 import {
   adminInsert, adminUpdate, adminSelect, getUserFromToken,
 } from './_supabase.js'
-import { sanitizeRecipe, moderateRecipe, recordViolation } from './_moderation.js'
+import { sanitizeRecipe, moderateRecipe, recordViolation, recipeContentHash } from './_moderation.js'
 
 export const config = { runtime: 'nodejs' }
 
@@ -15,9 +15,9 @@ export default async function handler(req, res) {
   if (!authUser?.id) return res.status(401).json({ error: 'unauthorized', message: 'נדרשת התחברות' })
   const userId = authUser.id
 
-  const [security] = await adminSelect('user_security', `id=eq.${userId}&select=banned,strikes,role`)
+  const [security] = await adminSelect('user_security', `id=eq.${userId}&select=banned,strikes,junk_strikes,role`)
   if (security?.banned) {
-    return res.status(403).json({ error: 'banned', message: 'החשבון נחסם עקב הפרות חוזרות.' })
+    return res.status(403).json({ error: 'banned', banned: true, banReason: 'abuse', message: 'החשבון נחסם עקב הפרות חוזרות.' })
   }
 
   const { id, recipe, tags, isPublic, image_url, source_url, imageBase64 } = req.body || {}
@@ -50,8 +50,11 @@ export default async function handler(req, res) {
 
   if (!mod.verdict.allowed) {
     const body = await recordViolation({
-      adminInsert, adminUpdate, userId, security,
-      safeRecipe, safeTags, verdict: mod.verdict, hadImage: mod.hadImage,
+      userId, security, verdict: mod.verdict, hadImage: mod.hadImage,
+      contentHash: recipeContentHash({ safeRecipe, safeTags }),
+      recipeTitle: safeRecipe.title,
+      snapshot: { title: safeRecipe.title, description: safeRecipe.description, tags: safeTags, category: safeRecipe.category },
+      counts: mod.verdict.kind === 'abuse',
     })
     return res.status(422).json(body)
   }
