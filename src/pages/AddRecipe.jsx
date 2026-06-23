@@ -13,6 +13,8 @@ const AI_STEPS = [
   { icon: '🏷️', label: 'תיוג אוטומטי' },
 ]
 
+const fieldLabel = { fontSize:'.78rem', color:'var(--text-muted)', display:'block', marginBottom:4 }
+
 function StepDots({ current }) {
   return (
     <div className="step-indicator">
@@ -166,20 +168,10 @@ export default function AddRecipe() {
       return
     }
 
-    // Auto-fetch image from TheMealDB by recipe title (free, no auth)
-    // Falls back to Pexels static images by category
-    const FALLBACK_IMAGES = {
-      'בשרי':        'https://images.unsplash.com/photo-1544025162-d76694265947?w=800&q=80',
-      'חלבי':        'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80',
-      'טבעוני':      'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&q=80',
-      'ארוחת בוקר': 'https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=800&q=80',
-      'קינוחים':     'https://images.unsplash.com/photo-1488477181228-c84a4bb4b8b7?w=800&q=80',
-      'שתייה':       'https://images.unsplash.com/photo-1544145945-f90425340c7e?w=800&q=80',
-      'אחר':         'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80',
-    }
+    // Only a user-uploaded photo is attached now. The auto-generated meal image
+    // is created server-side *after* the recipe passes moderation — so a blocked
+    // recipe never wastes an image generation.
     let image_url = null
-
-    // 1. User uploaded their own photo → compress + upload to Supabase Storage
     if (recipeImageFile) {
       try {
         const compressed = await compressImage(recipeImageFile)
@@ -191,32 +183,7 @@ export default function AddRecipe() {
           const { data: { publicUrl } } = supabase.storage.from('recipe-images').getPublicUrl(path)
           image_url = publicUrl
         }
-      } catch { /* fall through to auto-generate */ }
-    }
-
-    // 2. Auto-generate with Pollinations.ai (deterministic seed from title)
-    if (!image_url) {
-      try {
-        const searchTerm = recipe.image_search || recipe.title || 'food'
-        const seed = Math.abs(Array.from(searchTerm).reduce((h,c) => (h * 31 + c.charCodeAt(0)) | 0, 0))
-        const prompt = encodeURIComponent(`${searchTerm}, appetizing food photography, natural lighting, top view, professional`)
-        image_url = `https://image.pollinations.ai/prompt/${prompt}?seed=${seed}&nologo=true&width=800&height=600`
-      } catch { /* keep null */ }
-    }
-
-    // 3. Try TheMealDB as supplement (real photography, better quality)
-    // Skip if we already have an image; but note: TheMealDB is checked first if no user upload
-    if (!recipeImageFile) {
-      try {
-        const searchTerm = recipe.image_search || ''
-        if (searchTerm) {
-          const res  = await fetch(`https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(searchTerm)}`)
-          const json = await res.json()
-          if (json.meals?.[0]?.strMealThumb) {
-            image_url = json.meals[0].strMealThumb
-          }
-        }
-      } catch { /* keep Pollinations url */ }
+      } catch { /* no user image — server will auto-generate after it passes */ }
     }
 
     // Publish through the server-side moderation gate (the only path that can
@@ -231,11 +198,12 @@ export default function AddRecipe() {
           'Authorization': `Bearer ${session?.access_token || ''}`,
         },
         body: JSON.stringify({
-          recipe:     { ...recipe, tags },
+          recipe:       { ...recipe, tags },
           tags,
           isPublic,
           image_url,
-          source_url: inputType === 'link' ? url : null,
+          image_search: recipe.image_search || null, // server auto-generates if no user image
+          source_url:   inputType === 'link' ? url : null,
         }),
       })
       result = { status: res.status, body: await res.json() }
@@ -284,6 +252,15 @@ export default function AddRecipe() {
       setNewTag('')
     }
   }
+
+  // ── Edit the AI-parsed recipe before saving (brief: the user can always edit) ──
+  const setField     = (key, val) => setRecipe(r => ({ ...r, [key]: val }))
+  const setIng       = (idx, key, val) => setRecipe(r => ({ ...r, ingredients: (r.ingredients || []).map((it, i) => i === idx ? { ...it, [key]: val } : it) }))
+  const addIng       = () => setRecipe(r => ({ ...r, ingredients: [...(r.ingredients || []), { name: '', amount: '', unit: '' }] }))
+  const delIng       = idx => setRecipe(r => ({ ...r, ingredients: (r.ingredients || []).filter((_, i) => i !== idx) }))
+  const setStepText  = (idx, val) => setRecipe(r => ({ ...r, steps: (r.steps || []).map((it, i) => i === idx ? { ...it, text: val } : it) }))
+  const addStep      = () => setRecipe(r => ({ ...r, steps: [...(r.steps || []), { text: '', duration_seconds: null }] }))
+  const delStep      = idx => setRecipe(r => ({ ...r, steps: (r.steps || []).filter((_, i) => i !== idx) }))
 
   function copyLink() {
     const link = savedId ? `https://matkon.co/recipe/${savedId}` : 'https://matkon.co'
@@ -392,26 +369,58 @@ export default function AddRecipe() {
       {step === 3 && (
         <div className="add-body">
 
-          {/* Recipe preview */}
+          {/* Recipe — editable. The brief requires the user can always edit the AI
+              result before saving (fix a misread, change wording, etc.). */}
           {recipe && (
-            <div style={{ background:'var(--bg-elevated)', borderRadius:16, padding:16 }}>
-              <h2 style={{ marginBottom:6 }}>{recipe.title}</h2>
-              {recipe.description && <p style={{ color:'var(--text-2)', fontSize:'.9rem', marginBottom:12 }}>{recipe.description}</p>}
-              <div style={{ display:'flex', gap:12, fontSize:'.82rem', color:'var(--text-muted)', marginBottom:12 }}>
-                {recipe.prep_time > 0 && <span>⏱ הכנה: {recipe.prep_time} דק׳</span>}
-                {recipe.cook_time > 0 && <span>🔥 בישול: {recipe.cook_time} דק׳</span>}
-                {recipe.servings  > 0 && <span>🍽️ {recipe.servings} מנות</span>}
+            <div style={{ background:'var(--bg-elevated)', borderRadius:16, padding:16, display:'flex', flexDirection:'column', gap:12 }}>
+              <div>
+                <label style={fieldLabel}>כותרת</label>
+                <input className="input" value={recipe.title || ''} onChange={e => setField('title', e.target.value)} placeholder="שם המתכון" />
               </div>
-              {recipe.ingredients?.length > 0 && (
-                <>
-                  <div className="section-title" style={{ fontSize:'.85rem', marginBottom:8 }}>מצרכים</div>
-                  <ul style={{ paddingRight:16, fontSize:'.88rem', color:'var(--text-2)', lineHeight:1.8 }}>
-                    {recipe.ingredients.map((ing, i) => (
-                      <li key={i}>{ing.amount} {ing.unit} {ing.name}</li>
-                    ))}
-                  </ul>
-                </>
-              )}
+
+              <div>
+                <label style={fieldLabel}>תיאור</label>
+                <textarea className="input input-textarea" style={{ minHeight:80 }} value={recipe.description || ''} onChange={e => setField('description', e.target.value)} placeholder="תיאור קצר" />
+              </div>
+
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                <div><label style={fieldLabel}>זמן הכנה (דק׳)</label><input className="input" type="number" min="0" value={recipe.prep_time ?? 0} onChange={e => setField('prep_time', e.target.value)} /></div>
+                <div><label style={fieldLabel}>זמן בישול (דק׳)</label><input className="input" type="number" min="0" value={recipe.cook_time ?? 0} onChange={e => setField('cook_time', e.target.value)} /></div>
+                <div><label style={fieldLabel}>מנות</label><input className="input" type="number" min="1" value={recipe.servings ?? 2} onChange={e => setField('servings', e.target.value)} /></div>
+                <div>
+                  <label style={fieldLabel}>רמה</label>
+                  <select className="input" value={['קל','בינוני','מורכב'].includes(recipe.level) ? recipe.level : 'קל'} onChange={e => setField('level', e.target.value)}>
+                    <option value="קל">קל</option>
+                    <option value="בינוני">בינוני</option>
+                    <option value="מורכב">מורכב</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <div className="section-title" style={{ fontSize:'.85rem', marginBottom:8 }}>מצרכים</div>
+                {(recipe.ingredients || []).map((ing, idx) => (
+                  <div key={idx} style={{ display:'flex', gap:6, alignItems:'center', marginBottom:6 }}>
+                    <input className="input" style={{ flex:1, height:40, padding:'8px 10px' }} placeholder="שם" value={ing.name || ''} onChange={e => setIng(idx, 'name', e.target.value)} />
+                    <input className="input" style={{ width:56, height:40, padding:'8px 6px', textAlign:'center' }} placeholder="כמות" value={ing.amount || ''} onChange={e => setIng(idx, 'amount', e.target.value)} />
+                    <input className="input" style={{ width:64, height:40, padding:'8px 6px', textAlign:'center' }} placeholder="יח׳" value={ing.unit || ''} onChange={e => setIng(idx, 'unit', e.target.value)} />
+                    <button className="btn-icon" style={{ color:'var(--red)', flexShrink:0 }} onClick={() => delIng(idx)} aria-label="הסר מצרך"><IconX size={16} /></button>
+                  </div>
+                ))}
+                <button className="btn btn-ghost btn-sm" style={{ width:'auto', padding:'8px 12px', marginTop:4 }} onClick={addIng}><IconPlus size={16} /> הוסף מצרך</button>
+              </div>
+
+              <div>
+                <div className="section-title" style={{ fontSize:'.85rem', marginBottom:8 }}>שלבי הכנה</div>
+                {(recipe.steps || []).map((st, idx) => (
+                  <div key={idx} style={{ display:'flex', gap:6, alignItems:'flex-start', marginBottom:6 }}>
+                    <span style={{ color:'var(--blue-light)', fontSize:'.85rem', marginTop:11, flexShrink:0, width:16 }}>{idx + 1}.</span>
+                    <textarea className="input" style={{ flex:1, minHeight:44, padding:'8px 10px', resize:'vertical' }} placeholder={`שלב ${idx + 1}`} value={st.text || ''} onChange={e => setStepText(idx, e.target.value)} />
+                    <button className="btn-icon" style={{ color:'var(--red)', flexShrink:0 }} onClick={() => delStep(idx)} aria-label="הסר שלב"><IconX size={16} /></button>
+                  </div>
+                ))}
+                <button className="btn btn-ghost btn-sm" style={{ width:'auto', padding:'8px 12px', marginTop:4 }} onClick={addStep}><IconPlus size={16} /> הוסף שלב</button>
+              </div>
             </div>
           )}
 
@@ -436,7 +445,8 @@ export default function AddRecipe() {
           <div>
             <div className="section-title">תמונה למתכון</div>
 
-            {/* Preview: user photo OR Pollinations preview */}
+            {/* User photo preview, or an upload prompt. The auto-generated image is
+                created only after the recipe is saved — no preview generation here. */}
             {recipeImagePreview ? (
               <div className="recipe-img-preview" style={{ backgroundImage: `url(${recipeImagePreview})` }}>
                 <button
@@ -448,18 +458,13 @@ export default function AddRecipe() {
                 </button>
               </div>
             ) : (
-              <div style={{ position: 'relative' }}>
-                {recipe?.image_search && (
-                  <img
-                    src={`https://image.pollinations.ai/prompt/${encodeURIComponent((recipe.image_search || recipe.title) + ', appetizing food photography, natural lighting')}?seed=${Math.abs(Array.from((recipe.image_search||'food')).reduce((h,c)=>(h*31+c.charCodeAt(0))|0,0))}&nologo=true&width=800&height=400`}
-                    alt="תמונה שנוצרה אוטומטית"
-                    style={{ width:'100%', borderRadius:12, objectFit:'cover', aspectRatio:'2/1', display:'block' }}
-                    onError={e => { e.target.style.display='none' }}
-                  />
-                )}
+              <div>
+                <p style={{ fontSize:'.82rem', color:'var(--text-muted)', marginBottom:8, lineHeight:1.6 }}>
+                  לא חובה — אם לא תעלו תמונה, ניצור אחת אוטומטית אחרי השמירה.
+                </p>
                 <button
                   className="btn btn-ghost btn-sm"
-                  style={{ marginTop: 8, width:'100%' }}
+                  style={{ width:'100%' }}
                   onClick={() => recipeImgRef.current?.click()}
                   type="button"
                 >

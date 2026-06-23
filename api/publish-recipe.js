@@ -9,6 +9,17 @@ export const config = { runtime: 'nodejs' }
 // alert at 10/day lives in the admin dashboard; this is the hard publish stop.
 const DAILY_PUBLISH_CAP = 20
 
+// Build a deterministic Pollinations image URL from a visual search phrase.
+// The image itself is only rendered when the URL is fetched (on display) — so
+// building it here, post-moderation, costs nothing for blocked recipes.
+function pollinationsUrl(searchTerm) {
+  const term = (typeof searchTerm === 'string' ? searchTerm : '')
+    .replace(/[\x00-\x1F\x7F]/g, '').trim().slice(0, 300) || 'food dish'
+  const seed = Math.abs(Array.from(term).reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0))
+  const prompt = encodeURIComponent(`${term}, appetizing food photography, natural lighting, top view, professional`)
+  return `https://image.pollinations.ai/prompt/${prompt}?seed=${seed}&nologo=true&width=800&height=600`
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
@@ -30,7 +41,7 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'daily_cap', message: `הגעתם לתקרת הפרסום היומית (${DAILY_PUBLISH_CAP} מתכונים). נסו שוב מחר.` })
   }
 
-  const { recipe, tags, isPublic, image_url, source_url, imageBase64 } = req.body || {}
+  const { recipe, tags, isPublic, image_url, image_search, source_url, imageBase64 } = req.body || {}
   if (!recipe?.title) return res.status(400).json({ error: 'missing_recipe', message: 'חסרים פרטי מתכון' })
 
   // ── Validate & normalize input server-side (never trust the client payload) ──
@@ -58,6 +69,11 @@ export default async function handler(req, res) {
     return res.status(422).json(body)
   }
 
+  // No user image → auto-generate the meal image now, only because the recipe
+  // passed moderation. Generating after the gate avoids wasting an image on a
+  // recipe that ends up blocked.
+  const finalImage = safeImage || pollinationsUrl(image_search || safeRecipe.title)
+
   // ── Approved: insert the recipe with service role ──
   try {
     const created = await adminInsertReturning('recipes', {
@@ -72,12 +88,12 @@ export default async function handler(req, res) {
       category:    safeRecipe.category,
       tags:        safeTags,
       is_public:   isPublic === true, // private unless the user explicitly opted in
-      image_url:   safeImage,
+      image_url:   finalImage,
       source_url:  safeSource,
     })
     // Count AI image generations (Pollinations) for the resources dashboard.
     // Free today, but tracked so usage can be quantified before moving to a paid model.
-    if (safeImage && safeImage.includes('pollinations.ai')) {
+    if (finalImage && finalImage.includes('pollinations.ai')) {
       adminInsert('usage_log', {
         user_id: userId, endpoint: 'generate-image', model: 'pollinations-flux',
         input_tokens: 0, output_tokens: 0, cost_usd: 0,

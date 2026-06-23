@@ -4,10 +4,15 @@ import { moderateRawInput, recordViolation, hashContent, clampStr } from './_mod
 export const config = { runtime: 'nodejs' }
 
 const RATE_LIMIT_PER_HOUR = 10
-const MODEL = 'claude-haiku-4-5'
-// Haiku pricing: $0.80/MTok input, $4/MTok output
-const COST_PER_INPUT_TOKEN  = 0.0000008
-const COST_PER_OUTPUT_TOKEN = 0.000004
+// Text/link extraction → Haiku (cheap). Image extraction → Sonnet (far better
+// OCR/vision; Haiku misreads screenshots — brief gap "Sonnet for image only").
+const MODEL_TEXT   = 'claude-haiku-4-5'
+const MODEL_VISION = 'claude-sonnet-4-6'
+// Per-token pricing (input, output) for usage/cost logging.
+const PRICING = {
+  'claude-haiku-4-5':  { in: 0.0000008, out: 0.000004 },  // $0.80 / $4 per MTok
+  'claude-sonnet-4-6': { in: 0.000003,  out: 0.000015 },  // $3 / $15 per MTok
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
@@ -127,12 +132,17 @@ export default async function handler(req, res) {
 כללים:
 - החזר JSON בלבד, ללא טקסט נוסף
 - תרגם לעברית אם הטקסט באנגלית
+- כתוב מילים לועזיות בכתיב עברי תקני (למשל "פסטה" ולא "פאסטה", "ספגטי", "שניצל")
+- אם הקלט הוא תמונה — קרא בעיון את הטקסט שבתמונה וחלץ בדיוק את המתכון שמופיע בה. אל תשנה את סוג המנה ממה שכתוב, ואל תמציא או תוסיף מרכיבים שלא מופיעים בתמונה.
 - description: תיאור עובדתי וקצר (1-2 משפטים) המבוסס אך ורק על המתכון שנמסר. אל תמציא תוכן, אל תוסיף הומור, סגנון יצירתי, או "מרכיבים" שלא נמסרו (כמו "כעס" או "אהבה"). היצמד למה שהמשתמש כתב.
 - אם חסר מידע, השתמש בערכי ברירת מחדל הגיוניים
 - tags: בחר 2-4 תגיות רלוונטיות
 - level: קל / בינוני / מתקדם
 - image_search: תיאור ויזואלי מדויק באנגלית (8-12 מילים) של המנה הסופית כפי שהיא נראית בצלחת, בהתבסס על המרכיבים ואופן ההכנה. לדוגמה: "hard boiled eggs halved on white plate" ולא "eggs". הוסף בסוף ", appetizing food photography, natural lighting"
 - duration_seconds: אם בשלב כתוב זמן (למשל "בשלו 40 דקות") — המר לשניות. אחרת null`
+
+  // Image input gets the stronger vision model; text/link stay on Haiku.
+  const model = imageBase64 ? MODEL_VISION : MODEL_TEXT
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -143,7 +153,7 @@ export default async function handler(req, res) {
         'anthropic-version':'2023-06-01',
       },
       body: JSON.stringify({
-        model:      MODEL,
+        model,
         max_tokens: 2048,
         system:     systemPrompt,
         messages:   [{ role: 'user', content: userContent }],
@@ -159,13 +169,13 @@ export default async function handler(req, res) {
     const data = await response.json()
     const inputTokens  = data.usage?.input_tokens  || 0
     const outputTokens = data.usage?.output_tokens || 0
-    const costUsd      = (inputTokens * COST_PER_INPUT_TOKEN) + (outputTokens * COST_PER_OUTPUT_TOKEN)
+    const costUsd      = (inputTokens * PRICING[model].in) + (outputTokens * PRICING[model].out)
 
     // Log usage (fire-and-forget)
     adminInsert('usage_log', {
       user_id:       userId || null,
       endpoint:      'parse-recipe',
-      model:         MODEL,
+      model,
       input_tokens:  inputTokens,
       output_tokens: outputTokens,
       cost_usd:      costUsd,
