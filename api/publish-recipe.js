@@ -99,7 +99,7 @@ export default async function handler(req, res) {
         input_tokens: 0, output_tokens: 0, cost_usd: 0,
       })
     }
-    return res.status(200).json({ id: created.id })
+    return res.status(200).json({ id: created.id, image_url: finalImage })
   } catch (err) {
     console.error('publish insert error:', err)
     return res.status(500).json({ error: 'save_failed', message: 'שגיאה בשמירת המתכון. נסו שוב.' })

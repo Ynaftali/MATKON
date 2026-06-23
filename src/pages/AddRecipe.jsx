@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
-import { IconChevronRight, IconFlame, IconPencil, IconLink, IconCamera, IconPlus, IconX, IconLock, IconWorld, IconBrandWhatsapp, IconBrandInstagram, IconBrandFacebook, IconCopy, IconShieldX, IconHelpCircle, IconEdit, IconHome } from '@tabler/icons-react'
+import { IconChevronRight, IconFlame, IconPencil, IconLink, IconCamera, IconPlus, IconX, IconLock, IconWorld, IconBrandWhatsapp, IconBrandX, IconBrandFacebook, IconCopy, IconShieldX, IconHelpCircle, IconEdit, IconHome } from '@tabler/icons-react'
 import { compressImage } from '../lib/compressImage'
 
 const AI_STEPS = [
@@ -83,6 +83,7 @@ export default function AddRecipe() {
   const [saving, setSaving]         = useState(false)
   const [saveError, setSaveError]   = useState('')
   const [savedId, setSavedId]       = useState(null)
+  const [savedImage, setSavedImage] = useState(null)
   const [parsing, setParsing]       = useState(false)
   const [blockInfo, setBlockInfo]   = useState(null) // moderation block details (abuse/junk)
   const [recipeImageFile, setRecipeImageFile] = useState(null)
@@ -217,6 +218,7 @@ export default function AddRecipe() {
 
     if (result.status === 200) {
       setSavedId(result.body.id)
+      setSavedImage(result.body.image_url || null)
       setStep(4)
       return
     }
@@ -262,11 +264,23 @@ export default function AddRecipe() {
   const addStep      = () => setRecipe(r => ({ ...r, steps: [...(r.steps || []), { text: '', duration_seconds: null }] }))
   const delStep      = idx => setRecipe(r => ({ ...r, steps: (r.steps || []).filter((_, i) => i !== idx) }))
 
+  const shareLink = savedId ? `https://matkon.co/recipe/${savedId}` : 'https://matkon.co'
+
   function copyLink() {
-    const link = savedId ? `https://matkon.co/recipe/${savedId}` : 'https://matkon.co'
-    navigator.clipboard.writeText(link)
+    navigator.clipboard.writeText(shareLink)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  function shareTo(network) {
+    const u = encodeURIComponent(shareLink)
+    const t = encodeURIComponent(recipe?.title ? `מתכון: ${recipe.title}` : 'מתכון ב-MATKON')
+    const urls = {
+      whatsapp: `https://wa.me/?text=${t}%20${u}`,
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${u}`,
+      x:        `https://twitter.com/intent/tweet?text=${t}&url=${u}`,
+    }
+    window.open(urls[network], '_blank', 'noopener')
   }
 
   return (
@@ -520,21 +534,36 @@ export default function AddRecipe() {
       {/* ── Step 4: Share ── */}
       {step === 4 && (
         <div className="add-body" style={{ alignItems: 'center', textAlign: 'center' }}>
-          <div style={{ fontSize: '3rem' }}>🎉</div>
-          <h2>המתכון נשמר!</h2>
+          {savedImage && (
+            <div
+              style={{
+                width: '100%', aspectRatio: '16/10', borderRadius: 16, overflow: 'hidden',
+                backgroundImage: `url(${savedImage})`, backgroundSize: 'cover', backgroundPosition: 'center',
+                backgroundColor: 'var(--bg-mid)', marginBottom: 6,
+              }}
+              role="img"
+              aria-label={recipe?.title || 'תמונת המתכון'}
+            />
+          )}
+          {recipe?.title && (
+            <div style={{ color: 'var(--green)', fontWeight: 800, fontSize: '1.25rem', margin: '2px 0 6px' }}>
+              {recipe.title}
+            </div>
+          )}
+          <h2 style={{ margin: 0 }}>המתכון נשמר!</h2>
           <p style={{ color: 'var(--text-2)', fontSize: '.9rem' }}>שתפו עם החברים שלכם</p>
 
           <div className="share-btns" style={{ width: '100%', marginTop: 8 }}>
-            <button className="share-btn"><IconBrandWhatsapp size={20} color="#25d366" /> וואטסאפ</button>
+            <button className="share-btn" onClick={() => shareTo('whatsapp')}><IconBrandWhatsapp size={20} color="#25d366" /> וואטסאפ</button>
+            <button className="share-btn" onClick={() => shareTo('facebook')}><IconBrandFacebook size={20} color="#1877f2" /> פייסבוק</button>
+            <button className="share-btn" onClick={() => shareTo('x')}><IconBrandX size={20} /> X</button>
             <button className="share-btn" onClick={copyLink}>
               <IconCopy size={20} /> {copied ? 'הועתק!' : 'העתקת לינק'}
             </button>
-            <button className="share-btn"><IconBrandInstagram size={20} color="#e1306c" /> אינסטגרם</button>
-            <button className="share-btn"><IconBrandFacebook size={20} color="#1877f2" /> פייסבוק</button>
           </div>
 
-          <button className="btn btn-text" style={{ marginTop: 8 }} onClick={() => navigate('/feed')}>
-            אולי אחר כן, קחו אותי לקהילה
+          <button className="btn btn-ghost" style={{ marginTop: 12, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={() => navigate('/feed')}>
+            <IconHome size={16} /> בחזרה לעמוד הראשי
           </button>
         </div>
       )}
