@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
@@ -67,7 +67,14 @@ function BlockCard({ info, onEdit, onHome }) {
 
 export default function AddRecipe() {
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
+
+  // Adding a recipe requires an account (the server now rejects anonymous AI
+  // calls with 401). Bounce a guest to login rather than letting them fill the
+  // form and hit a silent failure.
+  useEffect(() => {
+    if (!loading && !user) navigate('/login', { replace: true })
+  }, [loading, user])
   const [step, setStep]           = useState(1)
   const [inputType, setInputType] = useState('text')
   const [text, setText]           = useState('')

@@ -200,10 +200,14 @@ export default function RecipePage() {
     if (country && recipe?.ingredients?.length) {
       setShoppingLoading(true)
       try {
+        const { data: { session } } = await supabase.auth.getSession()
         const res = await fetch('/api/translate-ingredients', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ingredients: recipe.ingredients, country, userId: currentUser?.id }),
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${session?.access_token || ''}`,
+          },
+          body: JSON.stringify({ ingredients: recipe.ingredients, country }),
         })
         if (res.ok) {
           const { enriched } = await res.json()

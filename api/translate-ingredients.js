@@ -1,4 +1,5 @@
-import { adminInsert, adminCount } from './_supabase.js'
+import { adminInsert, adminCount, getUserFromToken } from './_supabase.js'
+import { checkAiBudget } from './_budget.js'
 
 export const config = { runtime: 'nodejs' }
 
@@ -10,13 +11,24 @@ const COST_PER_OUTPUT_TOKEN = 0.000004
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
 
-  const { ingredients, country, userId } = req.body || {}
+  // Identity comes from the verified token, never from the body — a client-sent
+  // userId is untrusted (and could be omitted to skip rate limiting entirely).
+  const authUser = await getUserFromToken(req.headers.authorization)
+  const userId = authUser?.id || null
+
+  // Require authentication — this endpoint spends AI tokens, so anonymous access
+  // is an open cost hole. Translation only happens for a logged-in user's recipe.
+  if (!userId) {
+    return res.status(401).json({ error: 'unauthorized', message: 'יש להתחבר.' })
+  }
+
+  const { ingredients, country } = req.body || {}
   if (!ingredients?.length || !country) {
     return res.status(400).json({ error: 'Missing ingredients or country' })
   }
 
   // ── Rate limiting ────────────────────────────────────
-  if (userId) {
+  {
     const oneHourAgo = new Date(Date.now() - 3600_000).toISOString()
     const count = await adminCount(
       'usage_log',
@@ -25,6 +37,12 @@ export default async function handler(req, res) {
     if (count >= RATE_LIMIT_PER_HOUR) {
       return res.status(429).json({ error: 'הגעתם למגבלת השימוש. נסו שוב בעוד שעה.' })
     }
+  }
+
+  // ── Monthly AI budget guard (generic message — never expose budget internals) ──
+  const budget = await checkAiBudget('translate-ingredients')
+  if (budget.overHard) {
+    return res.status(503).json({ error: 'unavailable', message: 'השירות אינו זמין כעת. נסו שוב מאוחר יותר.' })
   }
 
   const system = `You are a culinary assistant. Given a list of recipe ingredients and a country, return a JSON array with:

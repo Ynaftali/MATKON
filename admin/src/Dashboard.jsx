@@ -130,6 +130,26 @@ export default function Dashboard({ profile, onLogout }) {
                 <div className="adm-res-lbl">סה״כ מאז ההשקה</div>
               </div>
             </div>
+
+            {stats.ai_budget && (() => {
+              const b = stats.ai_budget
+              const color = b.over_hard ? 'var(--red)' : b.near_soft ? '#e0a85e' : 'var(--green)'
+              const usd2 = n => `$${Number(n ?? 0).toFixed(2)}`
+              return (
+                <div style={{ margin: '14px 0 4px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: '.85rem', marginBottom: 6 }}>
+                    <span style={{ color: 'var(--text-2)' }}>תקציב החודש</span>
+                    <span style={{ color, fontWeight: 600 }}>{usd2(b.mtd)} / {usd2(b.cap)} · {b.pct}%</span>
+                  </div>
+                  <div style={{ height: 8, borderRadius: 5, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.min(100, b.pct)}%`, background: color, transition: 'width .3s' }} />
+                  </div>
+                  {b.over_hard && <div style={{ color: 'var(--red)', fontSize: '.8rem', marginTop: 6 }}>⛔ חריגה מהתקציב — קריאות AI חדשות חסומות עד תחילת החודש או הגדלת התקרה</div>}
+                  {!b.over_hard && b.near_soft && <div style={{ color: '#e0a85e', fontSize: '.8rem', marginTop: 6 }}>⚠️ מתקרבים לתקרת התקציב החודשית</div>}
+                </div>
+              )
+            })()}
+
             <div className="adm-res-sub">פירוט לפי קריאה (30 ימים)</div>
             {aiUsage.length ? (
               <div className="adm-list">

@@ -4,6 +4,7 @@ import {
   getShoppingList, toggleShoppingItem, removeChecked, clearAll
 } from '../lib/shopping'
 import { useAuth } from '../lib/AuthContext'
+import { supabase } from '../lib/supabase'
 import BottomNav from '../components/BottomNav'
 
 export default function Shopping() {
@@ -28,9 +29,13 @@ export default function Shopping() {
     async function doTranslate() {
       setTranslating(true)
       try {
+        const { data: { session } } = await supabase.auth.getSession()
         const res = await fetch('/api/translate-ingredients', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${session?.access_token || ''}`,
+          },
           body: JSON.stringify({
             ingredients: uncheckedItems.map(i => ({ name: i.name, amount: i.qty, unit: i.unit })),
             country,

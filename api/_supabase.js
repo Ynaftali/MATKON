@@ -24,6 +24,18 @@ export async function adminInsert(table, row) {
   } catch {}
 }
 
+// Call a Postgres function (RPC) with the service role. Throws on failure.
+export async function adminRpc(fn, args = {}) {
+  if (!SERVICE_ROLE_KEY) return null
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    method:  'POST',
+    headers: adminHeaders(),
+    body:    JSON.stringify(args),
+  })
+  if (!res.ok) throw new Error(`rpc ${fn} failed: ${res.status}`)
+  return res.json()
+}
+
 // Count rows matching a PostgREST filter string, e.g. "user_id=eq.xxx&created_at=gte.2026-01-01"
 export async function adminCount(table, filter) {
   if (!SERVICE_ROLE_KEY) return 0

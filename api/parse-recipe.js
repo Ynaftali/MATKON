@@ -1,5 +1,6 @@
 import { adminInsert, adminCount, adminSelect, getUserFromToken } from './_supabase.js'
 import { moderateRawInput, recordViolation, hashContent, clampStr } from './_moderation.js'
+import { checkAiBudget } from './_budget.js'
 
 export const config = { runtime: 'nodejs' }
 
@@ -21,6 +22,15 @@ export default async function handler(req, res) {
   // attributable to the real account that submitted the content.
   const authUser = await getUserFromToken(req.headers.authorization)
   const userId = authUser?.id || null
+
+  // Require authentication. Every call here spends AI tokens (image input runs
+  // on the costly Sonnet model), so anonymous access is an open cost hole and a
+  // least-privilege violation. Saving a recipe already requires an account, so
+  // there is no legitimate guest path — reject before any AI work happens.
+  if (!userId) {
+    return res.status(401).json({ error: 'unauthorized', message: 'יש להתחבר כדי להעלות מתכון.' })
+  }
+
   const { text, url, imageBase64 } = req.body || {}
 
   if (!text && !url && !imageBase64) {
@@ -28,7 +38,7 @@ export default async function handler(req, res) {
   }
 
   // ── Rate limiting (per authenticated user) ───────────
-  if (userId) {
+  {
     const oneHourAgo = new Date(Date.now() - 3600_000).toISOString()
     const count = await adminCount(
       'usage_log',
@@ -39,11 +49,18 @@ export default async function handler(req, res) {
     }
   }
 
+  // ── Monthly AI budget guard. Checked before moderation, because moderation
+  // itself spends AI tokens. Generic message — never expose budget internals. ──
+  const budget = await checkAiBudget('parse-recipe')
+  if (budget.overHard) {
+    return res.status(503).json({ error: 'unavailable', message: 'השירות אינו זמין כעת. נסו שוב מאוחר יותר.' })
+  }
+
   // ── Gate 1: moderate the RAW user input before the AI rewrite or any image
   // work, so bad content is stopped early and the user is judged only on what
   // they actually submitted. Skipped for link input (a URL isn't user-authored
   // content — that recipe is moderated at publish, gate 2).
-  if (userId && (text || imageBase64)) {
+  if (text || imageBase64) {
     const [security] = await adminSelect(
       'user_security',
       `id=eq.${userId}&select=banned,strikes,junk_strikes,role`
