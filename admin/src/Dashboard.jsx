@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   IconLogout, IconUsers, IconBook, IconWorld, IconCoin,
-  IconFlag, IconAlertTriangle, IconShieldLock, IconActivity,
+  IconFlag, IconAlertTriangle, IconShieldLock, IconActivity, IconPencil,
 } from '@tabler/icons-react'
 import { supabase } from './lib/supabase'
 import { countryFlag } from './lib/flags'
@@ -29,6 +29,18 @@ async function authedGet(path) {
   const res = await fetch(path, { headers: { Authorization: `Bearer ${session?.access_token || ''}` } })
   if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.message || 'שגיאה')
   return res.json()
+}
+
+async function authedPost(path, body) {
+  const { data: { session } } = await supabase.auth.getSession()
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+    body: JSON.stringify(body),
+  })
+  const json = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(json?.message || 'שגיאה')
+  return json
 }
 
 function StatCard({ icon, label, value, accent }) {
@@ -73,6 +85,37 @@ export default function Dashboard({ profile, onLogout }) {
   const [flags, setFlags] = useState(null)
   const [error, setError] = useState('')
   const [busy,  setBusy]  = useState(true)
+
+  // Budget editing (super_admin only — server enforces the same).
+  const isSuper = profile.role === 'super_admin'
+  const [editBudget,  setEditBudget]  = useState(false)
+  const [budgetInput, setBudgetInput] = useState('')
+  const [budgetBusy,  setBudgetBusy]  = useState(false)
+  const [budgetErr,   setBudgetErr]   = useState('')
+
+  function openBudgetEdit() {
+    setBudgetInput(String(stats?.ai_budget?.cap ?? ''))
+    setBudgetErr('')
+    setEditBudget(true)
+  }
+
+  async function saveBudget() {
+    const val = Number(budgetInput)
+    if (!Number.isFinite(val) || val < 1 || val > 150) {
+      setBudgetErr('יש להזין מספר בין 1 ל-150.')
+      return
+    }
+    setBudgetBusy(true); setBudgetErr('')
+    try {
+      const updated = await authedPost('/api/config', { budget: val })
+      setStats(prev => ({ ...prev, ai_budget: updated }))
+      setEditBudget(false)
+    } catch (e) {
+      setBudgetErr(e.message || 'שמירה נכשלה.')
+    } finally {
+      setBudgetBusy(false)
+    }
+  }
 
   useEffect(() => {
     let alive = true
@@ -131,14 +174,43 @@ export default function Dashboard({ profile, onLogout }) {
               </div>
             </div>
 
-            {stats.ai_budget && (() => {
+            {stats.ai_budget && editBudget && (
+              <div style={{ margin: '14px 0 4px', background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: 12, padding: 14 }}>
+                <div style={{ color: 'var(--text)', fontSize: '.9rem', fontWeight: 700, marginBottom: 4 }}>תקרת תקציב AI חודשית</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '.78rem', marginBottom: 12 }}>בהגעה ל-100% קריאות AI חדשות נחסמות עד תחילת החודש</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: budgetErr ? 6 : 14 }}>
+                  <span style={{ color: 'var(--text-2)' }}>$</span>
+                  <input className="input" type="text" inputMode="decimal" value={budgetInput} disabled={budgetBusy}
+                         onChange={e => setBudgetInput(e.target.value)}
+                         onKeyDown={e => { if (e.key === 'Enter') saveBudget() }}
+                         style={{ flex: 1 }} aria-label="תקרת תקציב חודשי בדולרים" />
+                </div>
+                {budgetErr && <div style={{ color: 'var(--red)', fontSize: '.8rem', marginBottom: 12 }}>{budgetErr}</div>}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn btn-green" style={{ flex: 1 }} onClick={saveBudget} disabled={budgetBusy}>
+                    {budgetBusy ? 'שומרים…' : 'שמירה'}
+                  </button>
+                  <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setEditBudget(false)} disabled={budgetBusy}>ביטול</button>
+                </div>
+              </div>
+            )}
+
+            {stats.ai_budget && !editBudget && (() => {
               const b = stats.ai_budget
               const color = b.over_hard ? 'var(--red)' : b.near_soft ? '#e0a85e' : 'var(--green)'
               const usd2 = n => `$${Number(n ?? 0).toFixed(2)}`
               return (
                 <div style={{ margin: '14px 0 4px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: '.85rem', marginBottom: 6 }}>
-                    <span style={{ color: 'var(--text-2)' }}>תקציב החודש</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '.85rem', marginBottom: 6 }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-2)' }}>
+                      תקציב החודש
+                      {isSuper && (
+                        <button onClick={openBudgetEdit} aria-label="עריכת תקרת התקציב"
+                                style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: 6, width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--blue-light)', cursor: 'pointer', padding: 0 }}>
+                          <IconPencil size={14} />
+                        </button>
+                      )}
+                    </span>
                     <span style={{ color, fontWeight: 600 }}>{usd2(b.mtd)} / {usd2(b.cap)} · {b.pct}%</span>
                   </div>
                   <div style={{ height: 8, borderRadius: 5, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}>

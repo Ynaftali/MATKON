@@ -48,6 +48,8 @@ p  { line-height: 1.6; }
 .btn-primary { background: var(--blue); color: #fff; }
 .btn-primary:hover:not(:disabled) { opacity: .9; }
 .btn-ghost { background: var(--bg-elevated); color: var(--text); }
+.btn-green { background: var(--green); color: #080d1c; }
+.btn-green:hover:not(:disabled) { opacity: .9; }
 .btn-sm { padding: 8px 16px; font-size: .85rem; border-radius: var(--radius-sm); width: auto; }
 .btn-icon {
   width: 40px; height: 40px; padding: 0; border-radius: 50%;

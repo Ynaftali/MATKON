@@ -31,6 +31,30 @@ export async function adminSelect(table, filter) {
   } catch { return [] }
 }
 
+// Patch rows matching a PostgREST filter; returns the updated rows. Throws on failure.
+export async function adminUpdate(table, filter, patch) {
+  if (!SERVICE_ROLE_KEY) throw new Error('service role key missing')
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}?${filter}`, {
+    method: 'PATCH',
+    headers: { ...adminHeaders(), Prefer: 'return=representation' },
+    body: JSON.stringify(patch),
+  })
+  if (!res.ok) throw new Error(`update ${table} failed: ${res.status} ${await res.text()}`)
+  return res.json()
+}
+
+// Insert a row; returns the inserted rows. Throws on failure.
+export async function adminInsert(table, row) {
+  if (!SERVICE_ROLE_KEY) throw new Error('service role key missing')
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: { ...adminHeaders(), Prefer: 'return=representation' },
+    body: JSON.stringify(row),
+  })
+  if (!res.ok) throw new Error(`insert ${table} failed: ${res.status} ${await res.text()}`)
+  return res.json()
+}
+
 // Verify a Supabase access token and return the authenticated user, or null.
 export async function getUserFromToken(authHeader) {
   const token = (authHeader || '').replace(/^Bearer\s+/i, '')
