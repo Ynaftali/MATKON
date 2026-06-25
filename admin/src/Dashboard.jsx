@@ -22,7 +22,9 @@ const ROLE_LABELS = {
 
 const fmtNum  = n => new Intl.NumberFormat('he-IL').format(n ?? 0)
 const fmtUsd  = n => `$${Number(n ?? 0).toFixed(4)}`
+const fmtUsd2 = n => `$${Number(n ?? 0).toFixed(2)}`
 const fmtDate = s => s ? new Date(s).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: '2-digit' }) : ''
+const fmtDateTime = s => s ? new Date(s).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''
 
 async function authedGet(path) {
   const { data: { session } } = await supabase.auth.getSession()
@@ -81,10 +83,11 @@ function BarList({ rows, labelKey, valueKey, accent }) {
 }
 
 export default function Dashboard({ profile, onLogout }) {
-  const [stats, setStats] = useState(null)
-  const [flags, setFlags] = useState(null)
-  const [error, setError] = useState('')
-  const [busy,  setBusy]  = useState(true)
+  const [stats,  setStats]  = useState(null)
+  const [flags,  setFlags]  = useState(null)
+  const [aiCost, setAiCost] = useState(null) // real billed cost (Anthropic Usage & Cost API)
+  const [error,  setError]  = useState('')
+  const [busy,   setBusy]   = useState(true)
 
   // Budget editing (super_admin only — server enforces the same).
   const isSuper = profile.role === 'super_admin'
@@ -124,6 +127,8 @@ export default function Dashboard({ profile, onLogout }) {
         const [s, f] = await Promise.all([authedGet('/api/stats'), authedGet('/api/flags')])
         if (!alive) return
         setStats(s); setFlags(f)
+        // Real billed cost is non-critical and never blocks the dashboard.
+        authedGet('/api/ai-cost').then(c => { if (alive) setAiCost(c) }).catch(() => {})
       } catch (e) {
         if (alive) setError(e.message || 'שגיאה בטעינת הדשבורד.')
       } finally {
@@ -163,16 +168,49 @@ export default function Dashboard({ profile, onLogout }) {
 
           <section className="adm-resources">
             <h2 className="adm-section-title"><IconCoin size={18} /> משאבים ועלויות AI</h2>
-            <div className="adm-res-figures">
-              <div className="adm-res-fig">
-                <div className="adm-res-val">{fmtUsd(stats.ai_cost_30d)}</div>
-                <div className="adm-res-lbl">30 הימים האחרונים</div>
-              </div>
-              <div className="adm-res-fig">
-                <div className="adm-res-val">{fmtUsd(stats.ai_cost_total)}</div>
-                <div className="adm-res-lbl">סה״כ מאז ההשקה</div>
-              </div>
-            </div>
+            {aiCost?.available ? (
+              <>
+                <div className="adm-res-figures">
+                  <div className="adm-res-fig">
+                    <div className="adm-res-val">{fmtUsd2(aiCost.mtd_usd)}</div>
+                    <div className="adm-res-lbl">החודש · חיוב בפועל</div>
+                  </div>
+                  <div className="adm-res-fig">
+                    <div className="adm-res-val">{fmtUsd2(aiCost.last30_usd)}</div>
+                    <div className="adm-res-lbl">30 יום · חיוב בפועל</div>
+                  </div>
+                </div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '.72rem', marginTop: 6 }}>
+                  ✓ נתוני אמת מ-Anthropic · עודכן {fmtDateTime(aiCost.asof)}
+                </div>
+                {aiCost.by_model?.length > 0 && (
+                  <div className="adm-list" style={{ marginTop: 10 }}>
+                    {aiCost.by_model.map((m, i) => (
+                      <div key={i} className="adm-list-row">
+                        <span className="adm-list-main">{m.model}</span>
+                        <span className="adm-list-meta">{fmtUsd2(m.usd)} החודש</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="adm-res-figures">
+                  <div className="adm-res-fig">
+                    <div className="adm-res-val">{fmtUsd(stats.ai_cost_30d)}</div>
+                    <div className="adm-res-lbl">30 יום · הערכה לפי טוקנים</div>
+                  </div>
+                  <div className="adm-res-fig">
+                    <div className="adm-res-val">{fmtUsd(stats.ai_cost_total)}</div>
+                    <div className="adm-res-lbl">סה״כ · הערכה לפי טוקנים</div>
+                  </div>
+                </div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '.72rem', marginTop: 6 }}>
+                  הערכה לפי טוקנים × מחירון. עלות אמת תוצג לאחר חיבור מפתח Admin של Anthropic.
+                </div>
+              </>
+            )}
 
             {stats.ai_budget && editBudget && (
               <div style={{ margin: '14px 0 4px', background: 'var(--bg-elevated)', border: '1px solid var(--border-mid)', borderRadius: 12, padding: 14 }}>
@@ -216,13 +254,16 @@ export default function Dashboard({ profile, onLogout }) {
                   <div style={{ height: 8, borderRadius: 5, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${Math.min(100, b.pct)}%`, background: color, transition: 'width .3s' }} />
                   </div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '.72rem', marginTop: 4 }}>
+                    {b.source === 'real' ? 'הבלם פועל לפי חיוב בפועל מ-Anthropic' : 'הבלם פועל לפי הערכת טוקנים (עד חיבור מפתח Admin)'}
+                  </div>
                   {b.over_hard && <div style={{ color: 'var(--red)', fontSize: '.8rem', marginTop: 6 }}>⛔ חריגה מהתקציב — קריאות AI חדשות חסומות עד תחילת החודש או הגדלת התקרה</div>}
                   {!b.over_hard && b.near_soft && <div style={{ color: '#e0a85e', fontSize: '.8rem', marginTop: 6 }}>⚠️ מתקרבים לתקרת התקציב החודשית</div>}
                 </div>
               )
             })()}
 
-            <div className="adm-res-sub">פירוט לפי קריאה (30 ימים)</div>
+            <div className="adm-res-sub">פירוט לפי קריאה (30 ימים · הערכה לפי טוקנים)</div>
             {aiUsage.length ? (
               <div className="adm-list">
                 {aiUsage.map((u, i) => (
