@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   IconLogout, IconUsers, IconBook, IconWorld, IconCoin,
-  IconFlag, IconAlertTriangle, IconShieldLock, IconActivity, IconPencil,
+  IconFlag, IconAlertTriangle, IconShieldLock, IconActivity, IconPencil, IconHistory,
 } from '@tabler/icons-react'
 import { supabase } from './lib/supabase'
 import { countryFlag } from './lib/flags'
@@ -18,6 +18,20 @@ const ROLE_LABELS = {
   super_admin: 'מנהל-על',
   admin:       'מנהל מערכת',
   moderator:   'מנהל תוכן',
+}
+
+const AUDIT_VIEWERS = new Set(['admin', 'super_admin'])
+
+const usd2 = n => `$${Number(n ?? 0).toFixed(2)}`
+
+// Friendly Hebrew description per action key. Falls back to the raw action.
+const AUDIT_DESCRIBERS = {
+  'budget.update': d => `עדכון תקרת תקציב AI · ${usd2(d?.from)} → ${usd2(d?.to)}`,
+}
+
+function describeAudit(row) {
+  const fn = AUDIT_DESCRIBERS[row.action]
+  return fn ? fn(row.details || {}) : row.action
 }
 
 const fmtNum  = n => new Intl.NumberFormat('he-IL').format(n ?? 0)
@@ -86,8 +100,11 @@ export default function Dashboard({ profile, onLogout }) {
   const [stats,  setStats]  = useState(null)
   const [flags,  setFlags]  = useState(null)
   const [aiCost, setAiCost] = useState(null) // real billed cost (Anthropic Usage & Cost API)
+  const [audit,  setAudit]  = useState(null) // recent admin actions (admin / super_admin only)
   const [error,  setError]  = useState('')
   const [busy,   setBusy]   = useState(true)
+
+  const canViewAudit = AUDIT_VIEWERS.has(profile.role)
 
   // Budget editing (super_admin only — server enforces the same).
   const isSuper = profile.role === 'super_admin'
@@ -129,6 +146,9 @@ export default function Dashboard({ profile, onLogout }) {
         setStats(s); setFlags(f)
         // Real billed cost is non-critical and never blocks the dashboard.
         authedGet('/api/ai-cost').then(c => { if (alive) setAiCost(c) }).catch(() => {})
+        if (canViewAudit) {
+          authedGet('/api/audit').then(a => { if (alive) setAudit(a.items || []) }).catch(() => {})
+        }
       } catch (e) {
         if (alive) setError(e.message || 'שגיאה בטעינת הדשבורד.')
       } finally {
@@ -342,6 +362,26 @@ export default function Dashboard({ profile, onLogout }) {
               </div>
             ) : <p className="adm-empty">אין משתמשים בעייתיים. 🎉</p>}
           </Section>
+
+          {canViewAudit && (
+            <Section title="פעולות מנהלים אחרונות" icon={<IconHistory size={18} />}>
+              {audit === null ? (
+                <p className="adm-empty">טוענים יומן…</p>
+              ) : audit.length ? (
+                <div className="adm-list">
+                  {audit.map(row => (
+                    <div key={row.id} className="adm-list-row">
+                      <span className="adm-list-main">
+                        {describeAudit(row)}
+                        <span className="adm-cat">{row.admin_name || row.admin_email || 'מנהל'}</span>
+                      </span>
+                      <span className="adm-list-meta">{fmtDateTime(row.created_at)}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : <p className="adm-empty">אין עדיין פעולות מתועדות.</p>}
+            </Section>
+          )}
 
           <p className="adm-footnote">טבלאות DB ופעולות ניהול (חסימה / מחיקה / הסתרה) — בשלב הבא.</p>
         </>

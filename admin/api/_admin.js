@@ -9,8 +9,8 @@ import { getUserFromToken, adminSelect } from './_supabase.js'
 const ROLE_CAPS = {
   user:        [],
   moderator:   ['dashboard.view', 'stats.view', 'flags.view', 'recipe.hide', 'content.remove'],
-  admin:       ['dashboard.view', 'stats.view', 'flags.view', 'recipe.hide', 'content.remove', 'users.manage', 'recipes.manage'],
-  super_admin: ['*'], // everything, incl. admin.create / role.assign / password.reset
+  admin:       ['dashboard.view', 'stats.view', 'flags.view', 'recipe.hide', 'content.remove', 'users.manage', 'recipes.manage', 'audit.view'],
+  super_admin: ['*'], // everything, incl. admin.create / role.assign / password.reset / audit.view
 }
 
 export function roleHasCapability(role, cap) {
