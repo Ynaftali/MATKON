@@ -31,6 +31,20 @@ export default function SSOCountry() {
       .eq('id', user.id)
     setSaving(false)
     if (error) { setError('שמירה נכשלה, נסו שוב.'); return }
+
+    // Forensic ToS log — server records IP + UA + version. Fire-and-forget so a
+    // transient network blip doesn't block onboarding (users.tos_accepted_at above
+    // is the primary record; this log is the court-defensible audit trail).
+    const { data: { session } } = await supabase.auth.getSession()
+    fetch('/api/log-tos', {
+      method:  'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        Authorization:   `Bearer ${session?.access_token || ''}`,
+      },
+      body: JSON.stringify({ source: 'sso_google' }),
+    }).catch(() => {})
+
     navigate('/complete-profile', { replace: true })
   }
 

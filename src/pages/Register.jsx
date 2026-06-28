@@ -49,6 +49,17 @@ export default function Register() {
     // signUp metadata (full_name, country). No client-side upsert needed — and the
     // old one wrote to the dropped `email` column, which fails silently.
 
+    // Forensic ToS log — server records IP + UA from request headers (the client
+    // never supplies them). Fire-and-forget: a network blip here shouldn't block
+    // signup, and the basic users.tos_accepted_at column is already set by the trigger.
+    if (data?.user?.id) {
+      fetch('/api/log-tos', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ user_id: data.user.id, source: 'email_signup' }),
+      }).catch(() => {})
+    }
+
     setLoading(false)
     localStorage.setItem('pending_email', form.email)
     navigate('/verify-email')
