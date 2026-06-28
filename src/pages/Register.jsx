@@ -15,6 +15,7 @@ const RULES = [
 export default function Register() {
   const navigate = useNavigate()
   const [form, setForm]   = useState({ firstName: '', lastName: '', email: '', password: '', confirm: '', country: '' })
+  const [tosAgreed, setTosAgreed] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
@@ -22,7 +23,7 @@ export default function Register() {
   const rulesPassed    = RULES.map(r => r.test(form.password))
   const allRulesPass   = rulesPassed.every(Boolean)
   const passwordsMatch = form.confirm ? form.password === form.confirm : null
-  const canSubmit      = allRulesPass && passwordsMatch && !loading
+  const canSubmit      = allRulesPass && passwordsMatch && tosAgreed && !loading
 
   const submit = async e => {
     e.preventDefault()
@@ -35,8 +36,9 @@ export default function Register() {
       password: form.password,
       options: {
         data: {
-          full_name: `${form.firstName} ${form.lastName}`,
-          country:   form.country,
+          full_name:       `${form.firstName} ${form.lastName}`,
+          country:         form.country,
+          tos_accepted_at: new Date().toISOString(),
         }
       }
     })
@@ -125,13 +127,21 @@ export default function Register() {
 
         {error && <p style={{ color:'var(--red)', fontSize:'.9rem', textAlign:'center' }}>{error}</p>}
 
+        <label style={{ display:'flex', alignItems:'flex-start', gap:8, fontSize:'.85rem', color:'var(--text-2)', cursor:'pointer', userSelect:'none' }}>
+          <input
+            type="checkbox"
+            checked={tosAgreed}
+            onChange={e => setTosAgreed(e.target.checked)}
+            style={{ marginTop:3, width:18, height:18, flexShrink:0, accentColor:'#3d6fa8', cursor:'pointer' }}
+          />
+          <span>
+            קראתי ואני מסכים/ה ל<a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color:'var(--blue-light)' }}>תנאי השימוש</a>
+          </span>
+        </label>
+
         <button className="btn btn-primary" type="submit" disabled={!canSubmit} style={{ backgroundColor: '#3d6fa8', borderColor: '#3d6fa8' }}>
           {loading ? 'יוצר חשבון...' : 'מוכנים להיכנס למטבח'}
         </button>
-
-        <p style={{ textAlign:'center', fontSize:'.8rem', color:'var(--text-muted)', marginTop:-4 }}>
-          בהרשמה אתם מסכימים ל<a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color:'var(--blue-light)' }}>תנאי השימוש</a>
-        </p>
 
         <div className="auth-divider">או הירשמו עם</div>
 
