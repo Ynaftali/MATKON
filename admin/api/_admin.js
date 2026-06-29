@@ -2,7 +2,7 @@
 //   1. token authenticity (Supabase verifies it)
 //   2. MFA — the token must be aal2 (the user completed the second factor)
 //   3. role capability (from user_security, never from the request)
-import { getUserFromToken, adminSelect } from './_supabase.js'
+import { getUserFromToken, adminAuth } from './_supabase.js'
 
 // super_admin is the only tier that can create/promote admins or assign roles.
 // admin manages content & users; moderator handles flags & hiding only.
@@ -40,7 +40,7 @@ export async function requireCapability(req, res, cap) {
     res.status(403).json({ error: 'mfa_required', message: 'נדרש אימות דו-שלבי.' }); return null
   }
 
-  const [sec] = await adminSelect('user_security', `id=eq.${authUser.id}&select=role,banned`)
+  const [sec] = await adminAuth.select('admin_user_security', `id=eq.${authUser.id}&select=role,banned`)
   const role = sec?.role || 'user'
   if (sec?.banned)                    { res.status(403).json({ error: 'banned',    message: 'החשבון חסום' });          return null }
   if (!roleHasCapability(role, cap))  { res.status(403).json({ error: 'forbidden', message: 'אין לך הרשאה לפעולה זו.' }); return null }

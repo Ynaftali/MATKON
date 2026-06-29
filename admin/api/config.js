@@ -1,5 +1,5 @@
 import { requireCapability } from './_admin.js'
-import { adminRpc, adminSelect, adminUpdate, adminInsert } from './_supabase.js'
+import { adminAuth, publicData } from './_supabase.js'
 
 export const config = { runtime: 'nodejs' }
 
@@ -25,12 +25,14 @@ export default async function handler(req, res) {
   const value = Math.round(next * 100) / 100
 
   try {
-    const [prev] = await adminSelect('app_config', `key=eq.${BUDGET_KEY}&select=value`)
+    // app_config + budget RPC live in project A (publicData).
+    const [prev] = await publicData.select('app_config', `key=eq.${BUDGET_KEY}&select=value`)
     const from = prev ? Number(prev.value) : null
 
-    await adminUpdate('app_config', `key=eq.${BUDGET_KEY}`, { value, updated_at: new Date().toISOString() })
+    await publicData.update('app_config', `key=eq.${BUDGET_KEY}`, { value, updated_at: new Date().toISOString() })
 
-    await adminInsert('admin_actions_log', {
+    // Audit log lives in project B (adminAuth) — admin identity belongs there.
+    await adminAuth.insert('admin_actions_log', {
       admin_id:    ctx.id,
       action:      'budget.update',
       target_type: 'app_config',
@@ -38,7 +40,7 @@ export default async function handler(req, res) {
       details:     { from, to: value },
     })
 
-    const budget = await adminRpc('ai_budget_status')
+    const budget = await publicData.rpc('ai_budget_status')
     return res.status(200).json(budget || { cap: value })
   } catch (err) {
     console.error('budget update error:', err)

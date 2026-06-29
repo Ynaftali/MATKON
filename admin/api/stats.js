@@ -1,5 +1,5 @@
 import { requireCapability } from './_admin.js'
-import { adminRpc } from './_supabase.js'
+import { publicData } from './_supabase.js'
 
 export const config = { runtime: 'nodejs' }
 
@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   if (!ctx) return
 
   try {
-    const stats = await adminRpc('admin_dashboard_stats')
+    const stats = await publicData.rpc('admin_dashboard_stats')
     return res.status(200).json(stats || {})
   } catch (err) {
     console.error('admin stats error:', err)

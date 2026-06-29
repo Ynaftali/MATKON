@@ -8,7 +8,7 @@
 // Auth: Admin API key (sk-ant-admin...) in the x-api-key header. This key is
 // org-wide and sensitive — it lives ONLY in the matkon-admin Vercel project
 // (Production, sensitive), never in the public app.
-import { adminUpdate } from './_supabase.js'
+import { publicData } from './_supabase.js'
 
 const ADMIN_KEY = process.env.ANTHROPIC_ADMIN_KEY
 const COST_URL  = 'https://api.anthropic.com/v1/organizations/cost_report'
@@ -85,7 +85,8 @@ export async function fetchRealSpend() {
 export async function syncRealSpend() {
   const spend = await fetchRealSpend()
   if (spend.available) {
-    await adminUpdate('app_config', 'key=eq.ai_real_spend', {
+    // app_config (incl. ai_real_spend snapshot) lives in project A.
+    await publicData.update('app_config', 'key=eq.ai_real_spend', {
       value:      { mtd_usd: spend.mtd_usd, last30_usd: spend.last30_usd, asof: spend.asof },
       updated_at: spend.asof,
     })

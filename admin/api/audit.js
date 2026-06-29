@@ -1,5 +1,5 @@
 import { requireCapability } from './_admin.js'
-import { adminRpc } from './_supabase.js'
+import { adminAuth } from './_supabase.js'
 
 export const config = { runtime: 'nodejs' }
 
@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   if (!ctx) return
 
   try {
-    const items = await adminRpc('admin_audit_recent', { _limit: 50 })
+    const items = await adminAuth.rpc('admin_audit_recent', { _limit: 50 })
     return res.status(200).json({ items: Array.isArray(items) ? items : [] })
   } catch (err) {
     console.error('audit fetch error:', err)

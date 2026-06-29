@@ -48,13 +48,14 @@ export default function App() {
     else { setAal(null); setProfile(undefined) }
   }, [session, refreshAal])
 
-  // Once MFA-verified (aal2), load the admin's role from user_security (self-read RLS)
+  // Once MFA-verified (aal2), load the admin's role from admin_user_security
+  // (project B; self-read RLS lets the admin see their own row only).
   useEffect(() => {
     if (!session || aal?.currentLevel !== 'aal2') return
     let alive = true
     ;(async () => {
       const { data } = await supabase
-        .from('user_security').select('role, banned').eq('id', session.user.id).maybeSingle()
+        .from('admin_user_security').select('role, banned').eq('id', session.user.id).maybeSingle()
       if (alive) setProfile({ id: session.user.id, email: session.user.email, role: data?.role || 'user', banned: !!data?.banned })
     })()
     return () => { alive = false }
