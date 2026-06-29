@@ -63,7 +63,7 @@ export default async function handler(req, res) {
   if (text || imageBase64) {
     const [security] = await adminSelect(
       'user_security',
-      `id=eq.${userId}&select=banned,strikes,junk_strikes,role`
+      `id=eq.${userId}&select=banned,strikes,junk_strikes`
     )
     if (security?.banned) {
       return res.status(403).json({ error: 'banned', banned: true, banReason: 'abuse', message: 'החשבון נחסם עקב הפרות חוזרות.' })

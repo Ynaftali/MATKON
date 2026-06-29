@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   if (!authUser?.id) return res.status(401).json({ error: 'unauthorized', message: 'נדרשת התחברות' })
   const userId = authUser.id
 
-  const [security] = await adminSelect('user_security', `id=eq.${userId}&select=banned,strikes,junk_strikes,role`)
+  const [security] = await adminSelect('user_security', `id=eq.${userId}&select=banned,strikes,junk_strikes`)
   if (security?.banned) {
     return res.status(403).json({ error: 'banned', banned: true, banReason: 'abuse', message: 'החשבון נחסם עקב הפרות חוזרות.' })
   }

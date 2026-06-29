@@ -27,16 +27,16 @@ export function AuthProvider({ children }) {
   }, [])
 
   async function loadProfile(userId) {
-    // Public profile fields live in `users`; sensitive fields (role/banned)
-    // live in `user_security`, readable only by the owner (and admins).
+    // Public profile fields live in `users`; sensitive `banned` lives in
+    // `user_security`, readable only by the owner. Admin role lives in a
+    // separate Supabase project (matkon.cloud) and is not relevant here.
     const [{ data: profileRow }, { data: securityRow }] = await Promise.all([
       supabase.from('users').select('*').eq('id', userId).maybeSingle(),
-      supabase.from('user_security').select('role, banned').eq('id', userId).maybeSingle(),
+      supabase.from('user_security').select('banned').eq('id', userId).maybeSingle(),
     ])
     if (!profileRow && !securityRow) return setProfile(null)
     setProfile({
       ...(profileRow || { id: userId }),
-      role:   securityRow?.role   || 'user',
       banned: securityRow?.banned || false,
     })
   }
