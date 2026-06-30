@@ -12,11 +12,21 @@ const DAILY_PUBLISH_CAP = 20
 // Build a deterministic Pollinations image URL from a visual search phrase.
 // The image itself is only rendered when the URL is fetched (on display) — so
 // building it here, post-moderation, costs nothing for blocked recipes.
+// SAFETY: AI-generated images skip vision moderation (cost), so the prompt is
+// hard-constrained here to food-only output — Flux follows positive natural-
+// language constraints reasonably well, and the parse-recipe AI is told to keep
+// the image_search phrase food-only too (defense in depth).
+const POLLINATIONS_SAFETY_SUFFIX =
+  'food only, dish plated on a clean surface, appetizing food photography, ' +
+  'natural lighting, top view, professional, no people, no children, no faces, ' +
+  'no hands, no text, no captions, no watermarks, no flags, no religious symbols, ' +
+  'no political symbols, no logos'
+
 function pollinationsUrl(searchTerm) {
   const term = (typeof searchTerm === 'string' ? searchTerm : '')
     .replace(/[\x00-\x1F\x7F]/g, '').trim().slice(0, 300) || 'food dish'
   const seed = Math.abs(Array.from(term).reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0))
-  const prompt = encodeURIComponent(`${term}, appetizing food photography, natural lighting, top view, professional`)
+  const prompt = encodeURIComponent(`${term}, ${POLLINATIONS_SAFETY_SUFFIX}`)
   return `https://image.pollinations.ai/prompt/${prompt}?seed=${seed}&nologo=true&width=800&height=600`
 }
 

@@ -155,7 +155,7 @@ export default async function handler(req, res) {
 - אם חסר מידע, השתמש בערכי ברירת מחדל הגיוניים
 - tags: בחר 2-4 תגיות רלוונטיות
 - level: קל / בינוני / מתקדם
-- image_search: תיאור ויזואלי מדויק באנגלית (8-12 מילים) של המנה הסופית כפי שהיא נראית בצלחת, בהתבסס על המרכיבים ואופן ההכנה. לדוגמה: "hard boiled eggs halved on white plate" ולא "eggs". הוסף בסוף ", appetizing food photography, natural lighting"
+- image_search: תיאור ויזואלי מדויק באנגלית (8-12 מילים) של **המנה בלבד** כפי שהיא נראית בצלחת, בהתבסס על המרכיבים ואופן ההכנה. לדוגמה: "hard boiled eggs halved on white plate" ולא "eggs". **חובה: רק האוכל. אסור לכלול בני אדם, ילדים, פנים, ידיים, טקסט/כיתוב, דגלים, סמלים דתיים או פוליטיים, או כל סמל מזהה. רק המנה על צלחת/משטח.** אל תוסיף עיטורי תיאור — סגנון הצילום והאיכות מוגדרים בשרת.
 - duration_seconds: אם בשלב כתוב זמן (למשל "בשלו 40 דקות") — המר לשניות. אחרת null`
 
   // Image input gets the stronger vision model; text/link stay on Haiku.

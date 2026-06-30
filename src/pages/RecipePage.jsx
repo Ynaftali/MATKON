@@ -226,15 +226,56 @@ export default function RecipePage() {
 
   async function handleImageReplace(e) {
     const file = e.target.files[0]
+    e.target.value = '' // allow re-selecting the same file after a rejection
     if (!file || !currentUser) return
-    const compressed = await compressImage(file)
-    const path = `${currentUser.id}/${recipe.id}.jpg`
-    const { data, error } = await supabase.storage.from('recipe-images').upload(path, compressed, { contentType: 'image/jpeg', upsert: true })
-    if (error) { showToast('שגיאה בהעלאת התמונה'); return }
-    const { data: { publicUrl } } = supabase.storage.from('recipe-images').getPublicUrl(path)
-    await supabase.from('recipes').update({ image_url: publicUrl }).eq('id', recipe.id)
-    setRecipe(r => ({ ...r, image_url: publicUrl }))
-    showToast('התמונה עודכנה ✓')
+
+    try {
+      const compressed = await compressImage(file)
+
+      // Vision-moderate the image BEFORE upload — without this gate the storage
+      // write would skip the community-image policy entirely (brief §33).
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload  = ev => resolve(ev.target.result.split(',')[1])
+        reader.onerror = reject
+        reader.readAsDataURL(compressed)
+      })
+
+      const { data: { session } } = await supabase.auth.getSession()
+      const modRes = await fetch('/api/moderate-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
+        },
+        body: JSON.stringify({ imageBase64: base64 }),
+      })
+      if (modRes.status === 422) {
+        const body = await modRes.json().catch(() => ({}))
+        showToast(body.message || 'התמונה לא עומדת בכללי הקהילה')
+        return
+      }
+      if (!modRes.ok) {
+        const body = await modRes.json().catch(() => ({}))
+        showToast(body.message || 'שגיאה בבדיקת התמונה')
+        return
+      }
+
+      const path = `${currentUser.id}/${recipe.id}.jpg`
+      const { error } = await supabase.storage
+        .from('recipe-images')
+        .upload(path, compressed, { contentType: 'image/jpeg', upsert: true })
+      if (error) { showToast('שגיאה בהעלאת התמונה'); return }
+
+      const { data: { publicUrl } } = supabase.storage.from('recipe-images').getPublicUrl(path)
+      // Cache-bust so the new image shows immediately (storage path is reused).
+      const busted = `${publicUrl}?v=${Date.now()}`
+      await supabase.from('recipes').update({ image_url: busted }).eq('id', recipe.id)
+      setRecipe(r => ({ ...r, image_url: busted }))
+      showToast('התמונה עודכנה ✓')
+    } catch {
+      showToast('שגיאה בהחלפת התמונה')
+    }
   }
 
   // Parse "1/2", "1 1/2", "1.5", "½" — AI/recipes mix fractions and decimals.
