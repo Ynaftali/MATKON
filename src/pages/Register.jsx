@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconChevronRight } from '@tabler/icons-react'
+import { IconChevronRight, IconEye, IconEyeOff } from '@tabler/icons-react'
 import { COUNTRIES } from '../lib/mock'
 import { supabase } from '../lib/supabase'
 import SsoButtons from '../components/SsoButtons'
@@ -14,16 +14,19 @@ const RULES = [
 
 export default function Register() {
   const navigate = useNavigate()
-  const [form, setForm]   = useState({ firstName: '', lastName: '', email: '', password: '', confirm: '', country: '' })
+  const [form, setForm]   = useState({ firstName: '', lastName: '', email: '', emailConfirm: '', password: '', confirm: '', country: '' })
   const [tosAgreed, setTosAgreed] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showPw, setShowPw]   = useState(false)
+  const [showPw2, setShowPw2] = useState(false)
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
   const rulesPassed    = RULES.map(r => r.test(form.password))
   const allRulesPass   = rulesPassed.every(Boolean)
   const passwordsMatch = form.confirm ? form.password === form.confirm : null
-  const canSubmit      = allRulesPass && passwordsMatch && tosAgreed && !loading
+  const emailsMatch    = form.emailConfirm ? form.email.trim().toLowerCase() === form.emailConfirm.trim().toLowerCase() : null
+  const canSubmit      = allRulesPass && passwordsMatch && emailsMatch && tosAgreed && !loading
 
   const submit = async e => {
     e.preventDefault()
@@ -92,12 +95,27 @@ export default function Register() {
 
         <div className="auth-field">
           <label className="auth-label">אימייל</label>
-          <input className="input" type="email" placeholder="your@email.com" value={form.email} onChange={set('email')} required />
+          <input className="input" type="email" placeholder="your@email.com" value={form.email} onChange={set('email')} required autoComplete="email" />
+        </div>
+
+        <div className="auth-field">
+          <label className="auth-label">וידוא אימייל</label>
+          <input className="input" type="email" placeholder="חזרו על האימייל" value={form.emailConfirm} onChange={set('emailConfirm')} required autoComplete="off" onPaste={e => e.preventDefault()} />
+          {emailsMatch !== null && (
+            <div className={`pw-match ${emailsMatch ? 'ok' : 'err'}`}>
+              {emailsMatch ? '✓ האימיילים תואמים' : '✗ האימיילים לא תואמים'}
+            </div>
+          )}
         </div>
 
         <div className="auth-field">
           <label className="auth-label">סיסמה</label>
-          <input className="input" type="password" placeholder="צרו סיסמה חזקה" value={form.password} onChange={set('password')} required />
+          <div className="input-wrap">
+            <input className="input" type={showPw ? 'text' : 'password'} placeholder="צרו סיסמה חזקה" value={form.password} onChange={set('password')} required />
+            <button type="button" className="input-eye" onClick={() => setShowPw(s => !s)} aria-label={showPw ? 'הסתירו סיסמה' : 'הציגו סיסמה'}>
+              {showPw ? <IconEyeOff size={18} /> : <IconEye size={18} />}
+            </button>
+          </div>
           {form.password && (
             <div className="pw-rules">
               {RULES.map((r, i) => (
@@ -112,7 +130,12 @@ export default function Register() {
 
         <div className="auth-field">
           <label className="auth-label">אימות סיסמה</label>
-          <input className="input" type="password" placeholder="חזרו על הסיסמה" value={form.confirm} onChange={set('confirm')} required />
+          <div className="input-wrap">
+            <input className="input" type={showPw2 ? 'text' : 'password'} placeholder="חזרו על הסיסמה" value={form.confirm} onChange={set('confirm')} required />
+            <button type="button" className="input-eye" onClick={() => setShowPw2(s => !s)} aria-label={showPw2 ? 'הסתירו סיסמה' : 'הציגו סיסמה'}>
+              {showPw2 ? <IconEyeOff size={18} /> : <IconEye size={18} />}
+            </button>
+          </div>
           {passwordsMatch !== null && (
             <div className={`pw-match ${passwordsMatch ? 'ok' : 'err'}`}>
               {passwordsMatch ? '✓ הסיסמאות תואמות' : '✗ הסיסמאות לא תואמות'}

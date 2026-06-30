@@ -76,11 +76,23 @@ export default function Profile() {
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [confirmText, setConfirmText] = useState('')
   const [busy, setBusy]           = useState(false)
+  const [likesCount, setLikesCount] = useState(0)
+  const [savedCount, setSavedCount] = useState(0)
 
   useEffect(() => {
     if (!authLoading && !user) { navigate('/login'); return }
-    if (user) loadRecipes(user.id)
+    if (user) { loadRecipes(user.id); loadCounts(user.id) }
   }, [user, authLoading])
+
+  async function loadCounts(userId) {
+    // Recipes I liked / saved (Brief §39: "כמה מתכונים אהב").
+    const [{ count: lc }, { count: sc }] = await Promise.all([
+      supabase.from('likes').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+      supabase.from('saved').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+    ])
+    setLikesCount(lc || 0)
+    setSavedCount(sc || 0)
+  }
 
   async function loadRecipes(userId) {
     setRecipesLoading(true)
@@ -169,10 +181,10 @@ export default function Profile() {
     </div>
   )
 
-  const fullName = profile?.full_name || 'משתמש'
-  const country  = profile?.country  || ''
-  const initials = fullName.split(' ').map(w => w[0]).filter(Boolean).join('').slice(0, 2) || '?'
-  const flag     = countryFlag(country)
+  const fullName  = profile?.full_name || 'משתמש'
+  const firstName = fullName.split(' ')[0] || 'משתמש'
+  const country   = profile?.country  || ''
+  const flag      = countryFlag(country)
 
   return (
     <div className="profile-page">
@@ -184,12 +196,13 @@ export default function Profile() {
           <IconLogout size={16} /> יציאה
         </button>
 
-        <div className="avatar avatar-xl">{initials}</div>
-        <div className="profile-name">{fullName}</div>
+        <div className="profile-flags" aria-hidden="true">
+          <span className="profile-flag">🇮🇱</span>
+          {flag && flag !== '🇮🇱' && <span className="profile-flag">{flag}</span>}
+        </div>
+        <div className="profile-name">{firstName}</div>
         {country && (
-          <div className="profile-location">
-            🇮🇱 {flag && flag !== '🇮🇱' ? `→ ${flag}` : ''} {country}
-          </div>
+          <div className="profile-location">{country}</div>
         )}
         {profile?.bio && (
           <div style={{ fontSize: '.85rem', color: 'var(--text-muted)', marginTop: 6, textAlign: 'center', maxWidth: 260 }}>
@@ -208,8 +221,8 @@ export default function Profile() {
           {[
             { val: recipes.length,                           lbl: 'מתכונים' },
             { val: recipes.filter(r => r.is_public).length, lbl: 'ציבוריים' },
-            { val: 0,                                        lbl: 'לייקים'  },
-            { val: 0,                                        lbl: 'שמורים'  },
+            { val: likesCount,                               lbl: 'לייקים'  },
+            { val: savedCount,                               lbl: 'שמורים'  },
           ].map(s => (
             <div key={s.lbl} className="profile-stat">
               <div className="profile-stat-val">{s.val}</div>

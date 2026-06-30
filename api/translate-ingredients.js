@@ -47,18 +47,20 @@ export default async function handler(req, res) {
 
   const system = `You are a culinary assistant. Given a list of recipe ingredients and a country, return a JSON array with:
 - The local name of each ingredient in the language/dialect spoken in that country
+- A shopping-aisle category for grouping in a shopping list
 - For unusual or hard-to-find ingredients in that country: where_to_buy (store type or area, 1-2 sentences max, specific to that country)
 - Note: NZ English and Australian English differ from American English (e.g. "coriander" not "cilantro" in NZ/AU/UK)
 
 Return ONLY valid JSON array:
 [
-  { "index": 0, "name_local": "local name", "where_to_buy": null },
-  { "index": 1, "name_local": "local name", "where_to_buy": "Asian supermarket or specialty food store" }
+  { "index": 0, "name_local": "local name", "category": "produce_veg", "where_to_buy": null },
+  { "index": 1, "name_local": "local name", "category": "pantry",      "where_to_buy": "Asian supermarket or specialty food store" }
 ]
 
 Rules:
 - index matches the position in the input array
-- name_local: translate to the local language of ${country}. If Hebrew ingredient has no local equivalent, transliterate.
+- name_local: translate to the local language of ${country}. If a Hebrew ingredient has no local equivalent, transliterate.
+- category: ONE of dairy, produce_veg, produce_fruit, meat_fish, spices, pantry, bakery, frozen, other. Eggs → meat_fish (protein aisle). Salt/sugar/oil → pantry. Fresh herbs → produce_veg. Dried herbs → spices.
 - where_to_buy: null if easily found in regular supermarkets. Non-null only for specialty/rare items.`
 
   const ingredientList = ingredients.map((ing, i) => {

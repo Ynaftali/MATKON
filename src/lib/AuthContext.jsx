@@ -16,11 +16,13 @@ export function AuthProvider({ children }) {
     })
 
     // Listen for auth changes (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const u = session?.user ?? null
       setUser(u)
       if (u) loadProfile(u.id)
       else setProfile(null)
+      // Once the user is properly signed in, the pending-signup hint is stale.
+      if (event === 'SIGNED_IN') localStorage.removeItem('pending_email')
     })
 
     return () => subscription.unsubscribe()

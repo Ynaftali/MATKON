@@ -81,9 +81,8 @@ export default function Community() {
 
         {tab === 'members' && MEMBERS.map((m,i) => (
           <div key={i} className="member-row">
-            <div className="avatar avatar-sm">{m.name[0]}</div>
             <div className="member-info">
-              <div className="member-name">{m.flag} {m.name}</div>
+              <div className="member-name">🇮🇱 {m.flag} {m.name.split(' ')[0]}</div>
             </div>
           </div>
         ))}

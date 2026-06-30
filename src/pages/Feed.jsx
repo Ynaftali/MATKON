@@ -96,11 +96,17 @@ export default function Feed() {
   }, [hasMore, loading, loadingMore, search, recipes.length, loadPage])
 
   const visible = search
-    ? recipes.filter(r =>
-        r.title?.includes(search) ||
-        r.description?.includes(search) ||
-        r.tags?.some(t => t.includes(search))
-      )
+    ? recipes.filter(r => {
+        const q = search.trim().toLowerCase()
+        return (
+          r.title?.toLowerCase().includes(q) ||
+          r.description?.toLowerCase().includes(q) ||
+          r.category?.toLowerCase().includes(q) ||
+          r.tags?.some(t => t.toLowerCase().includes(q)) ||
+          r.users?.full_name?.toLowerCase().includes(q) ||
+          r.users?.country?.toLowerCase().includes(q)
+        )
+      })
     : recipes
 
   return (
@@ -112,7 +118,7 @@ export default function Feed() {
         <div className="search-bar">
           <IconSearch size={18} />
           <input
-            placeholder="חפשו מתכון, מצרך, קטגוריה..."
+            placeholder="חפשו מתכון, קטגוריה, תגית, מדינה או חבר קהילה..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />

@@ -84,6 +84,17 @@ p  { line-height: 1.6; }
 .input::placeholder { color: var(--text-muted); }
 .input-textarea { min-height: 140px; resize: none; line-height: 1.6; }
 
+/* Password field with show/hide eye icon */
+.input-wrap { position: relative; }
+.input-wrap .input { padding-left: 44px; }
+.input-eye {
+  position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+  width: 32px; height: 32px; border: none; background: transparent;
+  color: var(--text-muted); display: flex; align-items: center; justify-content: center;
+  cursor: pointer; border-radius: 8px; transition: color .15s, background .15s;
+}
+.input-eye:hover { color: var(--text); background: rgba(255,255,255,.06); }
+
 /* ── Page shell ───────────────────────────────────── */
 .page { min-height: 100vh; background: var(--bg); display: flex; flex-direction: column; }
 .page-with-nav { padding-bottom: var(--nav-h); }
@@ -516,6 +527,25 @@ p  { line-height: 1.6; }
 .shopping-item.checked .shopping-check { background: var(--green); color: #080d1c; border-color: var(--green); }
 .shopping-name { font-size: .95rem; }
 
+/* Shopping list categories (Brief §247) */
+.shopping-group { margin-bottom: 14px; }
+.shopping-group-head {
+  display: flex; align-items: center; gap: 8px; padding: 12px 0 6px;
+  border-bottom: 1px solid var(--border-mid);
+  position: sticky; top: 0; background: var(--bg); z-index: 1;
+}
+.shopping-group-icon { font-size: 1.1rem; }
+.shopping-group-label { font-size: .9rem; font-weight: 700; color: var(--text); flex: 1; }
+.shopping-group-count {
+  font-size: .72rem; color: var(--text-muted); background: var(--bg-elevated);
+  border-radius: 999px; padding: 2px 8px; min-width: 22px; text-align: center;
+}
+.shopping-deleted-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 8px; border-bottom: 1px solid var(--border);
+}
+.shopping-deleted-row:last-child { border-bottom: none; }
+
 /* Recipe image preview in AddRecipe step 3 */
 .recipe-img-preview { width:100%; aspect-ratio:2/1; border-radius:12px; background-size:cover; background-position:center; position:relative; overflow:hidden; }
 .recipe-img-change  { position:absolute; bottom:8px; right:8px; display:flex; align-items:center; gap:6px; background:rgba(0,0,0,.6); color:#fff; border:none; border-radius:8px; padding:6px 12px; font-size:.8rem; cursor:pointer; }
@@ -619,6 +649,12 @@ p  { line-height: 1.6; }
   background: linear-gradient(to bottom, var(--bg-elevated) 0%, var(--bg) 100%);
   padding-bottom: 20px;
 }
+.profile-flags {
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  font-size: 3rem; line-height: 1;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.35));
+}
+.profile-flag { display: inline-block; transform: translateZ(0); }
 .profile-name { font-size: 1.4rem; font-weight: 800; margin-top: 4px; }
 .profile-location {
   display: inline-flex; align-items: center; gap: 8px;

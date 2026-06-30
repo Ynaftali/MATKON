@@ -27,11 +27,18 @@ function AuthCallback() {
       done = true
       const { data } = await supabase
         .from('users')
-        .select('country, tos_accepted_at')
+        .select('country, tos_accepted_at, bio')
         .eq('id', userId)
         .maybeSingle()
       const needsOnboarding = !data?.country || !data?.tos_accepted_at
-      navigate(needsOnboarding ? '/sso' : '/feed', { replace: true })
+      if (needsOnboarding) { navigate('/sso', { replace: true }); return }
+      // Brief §182: first-time-on-this-device users get the optional bio prompt.
+      if (!data?.bio && !localStorage.getItem('matkon_bio_prompt_seen')) {
+        navigate('/complete-profile', { replace: true })
+      } else {
+        if (!localStorage.getItem('matkon_bio_prompt_seen')) localStorage.setItem('matkon_bio_prompt_seen', '1')
+        navigate('/feed', { replace: true })
+      }
     }
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) route(session.user.id)

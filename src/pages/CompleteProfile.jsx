@@ -10,10 +10,18 @@ export default function CompleteProfile() {
   const [loading, setLoading] = useState(false)
 
   async function save() {
-    if (!user) { navigate('/feed'); return }
+    if (!user) { skip(); return }
     setLoading(true)
     await supabase.from('users').upsert({ id: user.id, bio })
     setLoading(false)
+    localStorage.setItem('matkon_bio_prompt_seen', '1')
+    navigate('/feed')
+  }
+
+  // Mark as seen even on skip — Brief §182 says this prompt is optional and
+  // only shown on first login. A repeat nag would be hostile.
+  function skip() {
+    localStorage.setItem('matkon_bio_prompt_seen', '1')
     navigate('/feed')
   }
 
@@ -45,7 +53,7 @@ export default function CompleteProfile() {
         <button
           className="btn btn-text"
           style={{ textAlign: 'center', display: 'block', width: '100%' }}
-          onClick={() => navigate('/feed')}
+          onClick={skip}
         >
           אולי אחר כן, קחו אותי לקהילה
         </button>

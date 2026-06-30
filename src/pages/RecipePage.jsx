@@ -44,8 +44,14 @@ export default function RecipePage() {
   const [comments, setComments]     = useState([])
   const [newComment, setNewComment] = useState('')
   const [sending, setSending]       = useState(false)
+  const [, setTick]                 = useState(0)  // forces timeAgo to refresh while page is open
   const { user: currentUser, profile } = useAuth()
   const commentsEndRef = useRef(null)
+
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 60_000)
+    return () => clearInterval(id)
+  }, [])
 
   function showToast(msg) {
     setToast(msg)
@@ -231,11 +237,39 @@ export default function RecipePage() {
     showToast('התמונה עודכנה ✓')
   }
 
+  // Parse "1/2", "1 1/2", "1.5", "½" — AI/recipes mix fractions and decimals.
+  function parseQty(qty) {
+    if (typeof qty === 'number') return qty
+    if (!qty) return NaN
+    const s = String(qty).trim()
+      .replace(/½/g, ' 1/2').replace(/¼/g, ' 1/4').replace(/¾/g, ' 3/4')
+      .replace(/⅓/g, ' 1/3').replace(/⅔/g, ' 2/3')
+      .replace(/⅛/g, ' 1/8').replace(/⅜/g, ' 3/8').replace(/⅝/g, ' 5/8').replace(/⅞/g, ' 7/8')
+      .replace(',', '.').trim()
+    const mix = s.match(/^(\d+)\s+(\d+)\s*\/\s*(\d+)$/)
+    if (mix) return parseInt(mix[1],10) + parseInt(mix[2],10) / parseInt(mix[3],10)
+    const frac = s.match(/^(\d+)\s*\/\s*(\d+)$/)
+    if (frac) return parseInt(frac[1],10) / parseInt(frac[2],10)
+    const n = parseFloat(s)
+    return isNaN(n) ? NaN : n
+  }
+
+  // Render scaled quantity as a fraction when it lands on a common one; otherwise round to 1 decimal.
   function fmtQty(qty) {
-    const n = parseFloat(qty)
-    if (!n) return qty
+    const n = parseQty(qty)
+    if (isNaN(n)) return qty
     const result = n * ratio
-    return Number.isInteger(result) ? result : result.toFixed(1)
+    if (Number.isInteger(result)) return result
+    const whole = Math.floor(result)
+    const frac  = result - whole
+    const COMMON = [
+      [1/8, '⅛'], [1/4, '¼'], [1/3, '⅓'], [3/8, '⅜'],
+      [1/2, '½'], [5/8, '⅝'], [2/3, '⅔'], [3/4, '¾'], [7/8, '⅞'],
+    ]
+    for (const [val, sym] of COMMON) {
+      if (Math.abs(frac - val) < 0.02) return whole > 0 ? `${whole}${sym}` : sym
+    }
+    return result.toFixed(1)
   }
 
   function fmtDuration(s) {
@@ -252,40 +286,17 @@ export default function RecipePage() {
 
   return (
     <div className="rpage">
-      {/* Hero */}
+      {/* Hero — image_url is set server-side by publish-recipe *after* moderation,
+          so we trust it. If empty (legacy/seed), fall back to the category gradient
+          rather than generating an unmoderated AI image on the client. */}
       <div className="rpage-hero" style={{ background: gradient }}>
-        {(() => {
-          const seed   = Math.abs(Array.from(recipe.title||'food').reduce((h,c)=>(h*31+c.charCodeAt(0))|0,0))
-          const prompt = encodeURIComponent(`${recipe.title||'Israeli food'}, Mediterranean dish, food photography, natural lighting`)
-          const aiUrl  = `https://image.pollinations.ai/prompt/${prompt}?seed=${seed}&nologo=true&model=flux-schnell&width=800&height=600`
-          const imgSrc = recipe.image_url || aiUrl
-
-          async function saveAiImage(url) {
-            if (recipe.image_url || !recipe.id) return
-            try {
-              const { error } = await supabase.from('recipes').update({ image_url: url }).eq('id', recipe.id)
-              if (!error) setRecipe(r => ({ ...r, image_url: url }))
-            } catch {}
-          }
-
-          return (
-            <img
-              src={imgSrc}
-              alt={recipe.title}
-              className="rpage-hero-bg"
-              style={{ opacity: recipe.image_url ? 1 : 0, transition: 'opacity 0.7s' }}
-              onLoad={e => { e.target.style.opacity = 1; if (!recipe.image_url) saveAiImage(imgSrc) }}
-              onError={e => { e.target.style.display = 'none' }}
-            />
-          )
-        })()}
-        {!recipe.image_url && currentUser?.id === recipe.user_id && (
-          <div
-            style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:8, color:'rgba(255,255,255,0.4)', cursor:'pointer', pointerEvents:'none' }}
-          >
-            <IconCamera size={28} />
-            <span style={{ fontSize:'.78rem' }}>מייצר תמונה...</span>
-          </div>
+        {recipe.image_url && (
+          <img
+            src={recipe.image_url}
+            alt={recipe.title}
+            className="rpage-hero-bg"
+            onError={e => { e.target.style.display = 'none' }}
+          />
         )}
         <div className="rpage-hero-overlay" />
         <div className="rpage-hero-top">
@@ -339,13 +350,10 @@ export default function RecipePage() {
           </button>
         </div>
 
-        {/* Author */}
+        {/* Author (per Brief: flags + first name only — no avatar) */}
         <div className="rpage-author">
-          <div className="avatar avatar-md">
-            {(user.full_name || 'א')[0]}
-          </div>
           <div className="rpage-author-info">
-            <div className="rpage-author-name">🇮🇱 {countryFlag(user.country)} {user.full_name}</div>
+            <div className="rpage-author-name">🇮🇱 {countryFlag(user.country)} {(user.full_name || '').split(' ')[0]}</div>
             <div className="rpage-author-loc">{user.country || ''}</div>
           </div>
         </div>
@@ -453,14 +461,13 @@ export default function RecipePage() {
             <div className="comments-list">
               {comments.map(c => {
                 const cu = c.users || {}
-                const initials = (cu.full_name || '?')[0]
+                const firstName = (cu.full_name || 'משתמש').split(' ')[0]
                 return (
                   <div key={c.id} className="comment-row">
-                    <div className="avatar avatar-sm comment-avatar">{initials}</div>
                     <div className="comment-body">
                       <div className="comment-meta">
                         <span className="comment-flags">🇮🇱 {countryFlag(cu.country)}</span>
-                        <span className="comment-name">{cu.full_name || 'משתמש'}</span>
+                        <span className="comment-name">{firstName}</span>
                         <span className="comment-time">{timeAgo(c.created_at)}</span>
                       </div>
                       <div className="comment-text">{c.content}</div>
