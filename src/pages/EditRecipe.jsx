@@ -7,6 +7,7 @@ import {
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import { compressImage } from '../lib/compressImage'
+import ImageRejectionModal from '../components/ImageRejectionModal'
 
 // Normalize stored ingredients (mock {name_he,quantity} or AI {name,amount}) to one editable shape.
 const normIngredients = arr => (Array.isArray(arr) ? arr : []).map(i => ({
@@ -48,6 +49,7 @@ export default function EditRecipe() {
 
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState('')
+  const [imageRejected, setImageRejected] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const imgRef = useRef()
@@ -110,11 +112,41 @@ export default function EditRecipe() {
     setError('')
     setSaving(true)
 
-    // Upload a replacement image if the user picked one.
+    // Upload a replacement image if the user picked one. Pre-moderate it
+    // BEFORE upload — image-only vision focuses Haiku on the photo alone
+    // (combined text+image moderation can be over-influenced by valid recipe
+    // text), and rejecting early avoids an orphan storage object.
     let image_url = imageUrl
     if (imageFile) {
       try {
         const compressed = await compressImage(imageFile)
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload  = ev => resolve(ev.target.result.split(',')[1])
+          reader.onerror = reject
+          reader.readAsDataURL(compressed)
+        })
+        const { data: { session: modSession } } = await supabase.auth.getSession()
+        const modRes = await fetch('/api/moderate-image', {
+          method: 'POST',
+          headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${modSession?.access_token || ''}`,
+          },
+          body: JSON.stringify({ imageBase64: base64 }),
+        })
+        if (modRes.status === 422) {
+          const body = await modRes.json().catch(() => ({}))
+          setSaving(false)
+          if (body.banned) { navigate('/blocked'); return }
+          setImageRejected(true) // blocking modal — same UX as RecipePage
+          return
+        }
+        if (!modRes.ok) {
+          setSaving(false)
+          setError('שגיאה בבדיקת התמונה. נסו שוב.')
+          return
+        }
         const path = `${user.id}/${id}-${Date.now()}.jpg`
         const { error: upErr } = await supabase.storage
           .from('recipe-images')
@@ -359,6 +391,8 @@ export default function EditRecipe() {
           </div>
         </div>
       )}
+
+      <ImageRejectionModal open={imageRejected} onClose={() => setImageRejected(false)} />
     </div>
   )
 }

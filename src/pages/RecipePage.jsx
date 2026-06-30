@@ -11,6 +11,7 @@ import { compressImage } from '../lib/compressImage'
 import { addIngredientsToList } from '../lib/shopping'
 import { useAuth } from '../lib/AuthContext'
 import BottomNav from '../components/BottomNav'
+import ImageRejectionModal from '../components/ImageRejectionModal'
 
 function timeAgo(ts) {
   const diff = Date.now() - new Date(ts).getTime()
@@ -36,6 +37,7 @@ export default function RecipePage() {
   const [saved, setSaved]             = useState(false)
   const [saveLoading, setSaveLoading] = useState(false)
   const [toast, setToast]           = useState('')
+  const [imageRejected, setImageRejected] = useState(false)
   const [shoppingOpen, setShoppingOpen]   = useState(false)
   const [shoppingDone, setShoppingDone]   = useState({})
   const [shoppingEnriched, setShoppingEnriched] = useState(null)
@@ -252,7 +254,8 @@ export default function RecipePage() {
       })
       if (modRes.status === 422) {
         const body = await modRes.json().catch(() => ({}))
-        showToast(body.message || 'התמונה לא עומדת בכללי הקהילה')
+        if (body.banned) { navigate('/blocked'); return }
+        setImageRejected(true) // blocking modal — never a quiet toast for policy rejection
         return
       }
       if (!modRes.ok) {
@@ -562,6 +565,8 @@ export default function RecipePage() {
       {toast && (
         <div className="toast">{toast}</div>
       )}
+
+      <ImageRejectionModal open={imageRejected} onClose={() => setImageRejected(false)} />
 
       {/* Shopping list drawer */}
       {shoppingOpen && (
