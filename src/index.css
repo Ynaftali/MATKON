@@ -546,6 +546,22 @@ p  { line-height: 1.6; }
 }
 .shopping-deleted-row:last-child { border-bottom: none; }
 
+/* Notifications drawer (Brief §244) */
+.notification-row {
+  display: flex; gap: 10px; padding: 12px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.notification-row:last-of-type { border-bottom: none; }
+.notification-row.unread { background: rgba(61, 111, 168, .07); border-radius: 8px; padding-inline: 10px; }
+.notification-icon {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--bg-elevated); color: var(--blue-light);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.notification-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.notification-text { font-size: .9rem; color: var(--text); line-height: 1.5; }
+.notification-time { font-size: .72rem; color: var(--text-muted); }
+
 /* Recipe image preview in AddRecipe step 3 */
 .recipe-img-preview { width:100%; aspect-ratio:2/1; border-radius:12px; background-size:cover; background-position:center; position:relative; overflow:hidden; }
 .recipe-img-change  { position:absolute; bottom:8px; right:8px; display:flex; align-items:center; gap:6px; background:rgba(0,0,0,.6); color:#fff; border:none; border-radius:8px; padding:6px 12px; font-size:.8rem; cursor:pointer; }

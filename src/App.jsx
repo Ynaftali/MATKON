@@ -22,29 +22,33 @@ function AuthCallback() {
   const navigate = useNavigate()
   useEffect(() => {
     let done = false
-    async function route(userId) {
+    async function route(user) {
       if (done) return
       done = true
       const { data } = await supabase
         .from('users')
         .select('country, tos_accepted_at, bio')
-        .eq('id', userId)
+        .eq('id', user.id)
         .maybeSingle()
       const needsOnboarding = !data?.country || !data?.tos_accepted_at
       if (needsOnboarding) { navigate('/sso', { replace: true }); return }
-      // Brief §182: first-time-on-this-device users get the optional bio prompt.
-      if (!data?.bio && !localStorage.getItem('matkon_bio_prompt_seen')) {
+      // Brief §182: first-time-on-this-device users get the optional bio prompt —
+      // gated on a fresh account so existing users without a bio aren't nagged.
+      const createdMs = user.created_at ? new Date(user.created_at).getTime() : 0
+      const isFresh   = createdMs > 0 && (Date.now() - createdMs < 10 * 60_000)
+      const seen      = !!localStorage.getItem('matkon_bio_prompt_seen')
+      if (!data?.bio && !seen && isFresh) {
         navigate('/complete-profile', { replace: true })
       } else {
-        if (!localStorage.getItem('matkon_bio_prompt_seen')) localStorage.setItem('matkon_bio_prompt_seen', '1')
+        if (!seen) localStorage.setItem('matkon_bio_prompt_seen', '1')
         navigate('/feed', { replace: true })
       }
     }
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) route(session.user.id)
+      if (session?.user) route(session.user)
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) route(session.user.id)
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) route(session.user)
     })
     return () => subscription.unsubscribe()
   }, [])

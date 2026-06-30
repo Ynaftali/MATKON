@@ -4,6 +4,7 @@ import { IconSearch, IconPlus, IconHeart, IconMessageCircle } from '@tabler/icon
 import { supabase } from '../lib/supabase'
 import { CATEGORY_GRADIENTS, countryFlag } from '../lib/mock'
 import BottomNav from '../components/BottomNav'
+import NotificationsBell from '../components/NotificationsBell'
 
 const FILTERS = ['הכל', 'בשרי', 'טבעוני', 'חלבי', 'ארוחת בוקר', 'קינוחים']
 
@@ -112,8 +113,9 @@ export default function Feed() {
   return (
     <div className="feed-page page-with-nav">
       <div className="feed-head">
-        <div className="feed-title">
+        <div className="feed-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
           <img src="/logofullNObackground.png" alt="matkon" style={{ height: 32, objectFit: 'contain' }} />
+          <NotificationsBell />
         </div>
         <div className="search-bar">
           <IconSearch size={18} />

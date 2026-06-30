@@ -22,10 +22,16 @@ export default function Login() {
     })
     setLoading(false)
     if (error) { setError('אימייל או סיסמה שגויים'); return }
-    // Brief §182: first-time-on-this-device users get the optional bio prompt.
+    // Brief §182: first-time-on-this-device users get the optional bio prompt —
+    // but ONLY when the account is fresh. An existing account that happens to
+    // have no bio shouldn't be nagged after we ship this feature.
     if (data?.user && !localStorage.getItem('matkon_bio_prompt_seen')) {
-      const { data: row } = await supabase.from('users').select('bio').eq('id', data.user.id).maybeSingle()
-      if (!row?.bio) { navigate('/complete-profile'); return }
+      const createdMs = new Date(data.user.created_at).getTime()
+      const isFresh   = Date.now() - createdMs < 10 * 60_000
+      if (isFresh) {
+        const { data: row } = await supabase.from('users').select('bio').eq('id', data.user.id).maybeSingle()
+        if (!row?.bio) { navigate('/complete-profile'); return }
+      }
       localStorage.setItem('matkon_bio_prompt_seen', '1')
     }
     navigate('/feed')
