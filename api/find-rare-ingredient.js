@@ -116,7 +116,10 @@ If you cannot find any real stores after searching, return an empty array: []`
       .map(s => ({ name: s.name.slice(0, 100), url: s.url.slice(0, 500) }))
 
     if (stores.length > 0) {
-      adminInsert('rare_ingredient_stores', { ingredient, country, stores })
+      // Awaited (unlike the usage_log write above) — losing this defeats the
+      // whole point of the cache, and Vercel can kill in-flight unawaited
+      // promises the instant the response is sent.
+      await adminInsert('rare_ingredient_stores', { ingredient, country, stores })
     }
 
     return res.status(200).json({ stores, cached: false })
