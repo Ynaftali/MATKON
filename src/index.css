@@ -369,14 +369,22 @@ p  { line-height: 1.6; }
 .ingredient-he    { font-weight: 600; font-size: .95rem; }
 .ingredient-local { font-size: .8rem; color: var(--text-muted); }
 
-.rare-box {
-  background: var(--bg-elevated); border: 1px solid rgba(224,82,82,.25); border-radius: var(--radius);
-  padding: 14px; margin-top: 12px;
+.rare-toggle {
+  cursor: pointer; font-family: inherit;
 }
-.rare-box-title { font-size: .85rem; font-weight: 700; color: #f08080; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
-.rare-item { padding: 6px 0; border-bottom: 1px solid var(--border); font-size: .88rem; color: var(--text-2); }
-.rare-item:last-child { border-bottom: none; }
-.rare-item strong { color: var(--text); display: block; margin-bottom: 2px; }
+.rare-chevron { transition: transform .15s ease; }
+.rare-chevron.open { transform: rotate(180deg); }
+
+.rare-dropdown {
+  background: var(--bg-elevated); border: 1px solid rgba(224,82,82,.25); border-radius: var(--radius);
+  padding: 10px 12px; margin: 4px 0 10px; font-size: .85rem;
+}
+.rare-dropdown-msg { color: var(--text-muted); }
+.rare-store-link {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 0; border-bottom: 1px solid var(--border); color: var(--blue-light); text-decoration: none;
+}
+.rare-store-link:last-child { border-bottom: none; }
 
 /* Steps */
 .step-row { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--border); }

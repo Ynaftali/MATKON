@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { IconTrash, IconShare, IconCheck, IconShoppingCart, IconArchive, IconArrowBackUp, IconX } from '@tabler/icons-react'
+import { IconTrash, IconShare, IconCheck, IconShoppingCart, IconArchive, IconArrowBackUp, IconX, IconChevronDown, IconExternalLink } from '@tabler/icons-react'
 import {
   getShoppingList, getDeletedShoppingItems,
   toggleShoppingItem, moveCheckedToDeleted, clearAll,
@@ -15,7 +15,37 @@ export default function Shopping() {
   const [deleted, setDeleted]       = useState(getDeletedShoppingItems)
   const [libraryOpen, setLibraryOpen] = useState(false)
   const [translating, setTranslating] = useState(false)
+  const [rareStores, setRareStores] = useState({}) // { [itemId]: { open, loading, stores, error } }
   const { profile } = useAuth()
+
+  async function toggleRareStores(itemId, ingredientName) {
+    const current = rareStores[itemId]
+    if (current?.open) {
+      setRareStores(prev => ({ ...prev, [itemId]: { ...prev[itemId], open: false } }))
+      return
+    }
+    if (current?.stores || current?.loading) {
+      setRareStores(prev => ({ ...prev, [itemId]: { ...prev[itemId], open: true } }))
+      return
+    }
+    setRareStores(prev => ({ ...prev, [itemId]: { open: true, loading: true, stores: null, error: false } }))
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/find-rare-ingredient', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ ingredient: ingredientName, country: profile?.country || '' }),
+      })
+      if (res.ok) {
+        const { stores } = await res.json()
+        setRareStores(prev => ({ ...prev, [itemId]: { open: true, loading: false, stores: stores || [], error: false } }))
+      } else {
+        setRareStores(prev => ({ ...prev, [itemId]: { open: true, loading: false, stores: [], error: true } }))
+      }
+    } catch {
+      setRareStores(prev => ({ ...prev, [itemId]: { open: true, loading: false, stores: [], error: true } }))
+    }
+  }
 
   useEffect(() => {
     const onStorage = () => {
@@ -153,7 +183,7 @@ export default function Shopping() {
               <span className="shopping-group-count">{group.items.length}</span>
             </div>
             {group.items.map(item => (
-              <ShoppingRow key={item.id} item={item} onToggle={toggle} />
+              <ShoppingRow key={item.id} item={item} onToggle={toggle} rare={rareStores[item.id]} onToggleRare={toggleRareStores} />
             ))}
           </div>
         ))}
@@ -166,7 +196,7 @@ export default function Shopping() {
               <span className="shopping-group-count">{checked.length}</span>
             </div>
             {checked.map(item => (
-              <ShoppingRow key={item.id} item={item} onToggle={toggle} />
+              <ShoppingRow key={item.id} item={item} onToggle={toggle} rare={rareStores[item.id]} onToggleRare={toggleRareStores} />
             ))}
           </div>
         )}
@@ -246,38 +276,60 @@ export default function Shopping() {
   )
 }
 
-function ShoppingRow({ item, onToggle }) {
+function ShoppingRow({ item, onToggle, rare, onToggleRare }) {
   const unit      = item.unit && item.unit !== item.name ? item.unit : ''
   const qtyStr    = item.qty > 0 ? `${item.qty}${unit ? ' ' + unit : ''} ` : ''
   const localName = item.name_local
   const localStr  = localName && localName !== item.name ? ` · ${localName}` : ''
-  const whereBuy  = item.where_to_buy
+  const isRare    = !!item.where_to_buy
 
   return (
-    <div
-      className={`shopping-item ${item.checked ? 'checked' : ''}`}
-      onClick={() => onToggle(item.id)}
-      style={{ cursor: 'pointer' }}
-    >
-      <div className="shopping-check">
-        {item.checked ? <IconCheck size={14} /> : ''}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="shopping-name" style={{ wordBreak: 'break-word' }}>
-          {qtyStr}<strong>{item.name}</strong>
-          <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>{localStr}</span>
+    <div>
+      <div
+        className={`shopping-item ${item.checked ? 'checked' : ''}`}
+        onClick={() => onToggle(item.id)}
+        style={{ cursor: 'pointer' }}
+      >
+        <div className="shopping-check">
+          {item.checked ? <IconCheck size={14} /> : ''}
         </div>
-        {whereBuy && (
-          <div style={{ fontSize: '.72rem', color: 'var(--blue-light)', marginTop: 3, wordBreak: 'break-word' }}>
-            📍 {whereBuy}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="shopping-name" style={{ wordBreak: 'break-word' }}>
+            {qtyStr}<strong>{item.name}</strong>
+            <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>{localStr}</span>
           </div>
-        )}
-        {item.recipes?.length > 0 && (
-          <div style={{ fontSize: '.72rem', color: 'var(--green)', marginTop: 3 }}>
-            מתכון: {item.recipes.join(' · ')}
-          </div>
-        )}
+          {isRare && (
+            <button
+              type="button"
+              className="tag tag-rare rare-toggle"
+              style={{ marginTop: 4 }}
+              onClick={e => { e.stopPropagation(); onToggleRare(item.id, item.name_local || item.name) }}
+            >
+              📍 איפה למצוא
+              <IconChevronDown size={12} className={rare?.open ? 'rare-chevron open' : 'rare-chevron'} />
+            </button>
+          )}
+          {item.recipes?.length > 0 && (
+            <div style={{ fontSize: '.72rem', color: 'var(--green)', marginTop: 3 }}>
+              מתכון: {item.recipes.join(' · ')}
+            </div>
+          )}
+        </div>
       </div>
+      {rare?.open && (
+        <div className="rare-dropdown" onClick={e => e.stopPropagation()} style={{ marginRight: 38 }}>
+          {rare.loading && <div className="rare-dropdown-msg">מחפש חנויות…</div>}
+          {!rare.loading && rare.error && <div className="rare-dropdown-msg">לא הצלחנו לחפש כרגע. נסו שוב מאוחר יותר.</div>}
+          {!rare.loading && !rare.error && rare.stores?.length === 0 && (
+            <div className="rare-dropdown-msg">לא נמצאו חנויות ספציפיות.</div>
+          )}
+          {!rare.loading && rare.stores?.map((store, sIdx) => (
+            <a key={sIdx} href={store.url} target="_blank" rel="noopener noreferrer" className="rare-store-link">
+              {store.name} <IconExternalLink size={13} />
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

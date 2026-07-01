@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
-  IconChevronRight, IconShare, IconClock, IconUsers, IconStar,
+  IconChevronRight, IconChevronDown, IconShare, IconClock, IconUsers, IconStar,
   IconMessageCircle, IconShoppingCart, IconAlertTriangle, IconExternalLink,
   IconHeart, IconBookmark, IconSend, IconCheck, IconCamera, IconPencil
 } from '@tabler/icons-react'
@@ -49,6 +49,7 @@ export default function RecipePage() {
   const [, setTick]                 = useState(0)  // forces timeAgo to refresh while page is open
   const { user: currentUser, profile } = useAuth()
   const commentsEndRef = useRef(null)
+  const [rareStores, setRareStores] = useState({}) // { [idx]: { open, loading, stores, error } }
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 60_000)
@@ -133,7 +134,6 @@ export default function RecipePage() {
 
   const ratio     = recipe ? servings / (recipe.servings || 4) : 1
   const gradient  = CATEGORY_GRADIENTS[recipe?.category] || 'linear-gradient(160deg, #1e3a6e, #3d6fa8)'
-  const rareItems = recipe?.ingredients?.filter(i => i.is_rare) || []
   const user      = recipe?.users || {}
 
   async function loadComments(recipeId) {
@@ -180,6 +180,35 @@ export default function RecipePage() {
       setLiked(true)
     }
     setLikeLoading(false)
+  }
+
+  async function toggleRareStores(idx, ingredientName) {
+    const current = rareStores[idx]
+    if (current?.open) {
+      setRareStores(prev => ({ ...prev, [idx]: { ...prev[idx], open: false } }))
+      return
+    }
+    if (current?.stores || current?.loading) {
+      setRareStores(prev => ({ ...prev, [idx]: { ...prev[idx], open: true } }))
+      return
+    }
+    setRareStores(prev => ({ ...prev, [idx]: { open: true, loading: true, stores: null, error: false } }))
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/find-rare-ingredient', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
+        body: JSON.stringify({ ingredient: ingredientName, country: profile?.country || '' }),
+      })
+      if (res.ok) {
+        const { stores } = await res.json()
+        setRareStores(prev => ({ ...prev, [idx]: { open: true, loading: false, stores: stores || [], error: false } }))
+      } else {
+        setRareStores(prev => ({ ...prev, [idx]: { open: true, loading: false, stores: [], error: true } }))
+      }
+    } catch {
+      setRareStores(prev => ({ ...prev, [idx]: { open: true, loading: false, stores: [], error: true } }))
+    }
   }
 
   function logShare(channel) {
@@ -450,29 +479,43 @@ export default function RecipePage() {
             const name = ing.name_he || ing.name || ''
             const qty  = ing.quantity || ing.amount || ''
             const unit = ing.unit || ''
+            const rare = rareStores[idx]
             return (
-              <div key={ing.id || idx} className="ingredient-row">
-                <div className="ingredient-qty">{fmtQty(qty)} {unit}</div>
-                <div className="ingredient-names">
-                  <div className="ingredient-he">{name}</div>
-                  {ing.name_local && <div className="ingredient-local">{ing.name_local}</div>}
+              <div key={ing.id || idx}>
+                <div className="ingredient-row">
+                  <div className="ingredient-qty">{fmtQty(qty)} {unit}</div>
+                  <div className="ingredient-names">
+                    <div className="ingredient-he">{name}</div>
+                    {ing.name_local && <div className="ingredient-local">{ing.name_local}</div>}
+                  </div>
+                  {ing.is_rare && (
+                    <button
+                      type="button"
+                      className="tag tag-rare rare-toggle"
+                      onClick={() => toggleRareStores(idx, ing.name_local || name)}
+                    >
+                      <IconAlertTriangle size={11} /> נדיר
+                      <IconChevronDown size={12} className={rare?.open ? 'rare-chevron open' : 'rare-chevron'} />
+                    </button>
+                  )}
                 </div>
-                {ing.is_rare && <span className="tag tag-rare"><IconAlertTriangle size={11} /> נדיר</span>}
+                {rare?.open && (
+                  <div className="rare-dropdown">
+                    {rare.loading && <div className="rare-dropdown-msg">מחפש חנויות…</div>}
+                    {!rare.loading && rare.error && <div className="rare-dropdown-msg">לא הצלחנו לחפש כרגע. נסו שוב מאוחר יותר.</div>}
+                    {!rare.loading && !rare.error && rare.stores?.length === 0 && (
+                      <div className="rare-dropdown-msg">לא נמצאו חנויות ספציפיות.</div>
+                    )}
+                    {!rare.loading && rare.stores?.map((store, sIdx) => (
+                      <a key={sIdx} href={store.url} target="_blank" rel="noopener noreferrer" className="rare-store-link">
+                        {store.name} <IconExternalLink size={13} />
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             )
           })}
-
-          {rareItems.length > 0 && (
-            <div className="rare-box">
-              <div className="rare-box-title"><IconAlertTriangle size={15} /> איפה לקנות מצרכים נדירים</div>
-              {rareItems.map(item => (
-                <div key={item.id} className="rare-item">
-                  <strong>{item.name_he}</strong>
-                  {item.where_to_buy}
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Steps */}
