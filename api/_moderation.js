@@ -12,10 +12,17 @@
 import { createHash } from 'crypto'
 import { adminInsert, adminUpdate, adminCount } from './_supabase.js'
 
-export const MODEL = 'claude-haiku-4-5'
-// Haiku pricing: $0.80/MTok input, $4/MTok output
-const COST_PER_INPUT_TOKEN  = 0.0000008
-const COST_PER_OUTPUT_TOKEN = 0.000004
+// Model split: text-only stays on cheap Haiku; anything with an image escalates
+// to Sonnet — Haiku vision is documented weak (memory 23.6: it misread a nude
+// cartoon as "not-a-recipe" instead of the "sexual" abuse category it belongs
+// to). This mirrors the parse-recipe extraction split.
+export const MODEL        = 'claude-haiku-4-5' // legacy export (kept for callers not in this repo)
+const MODEL_TEXT_ONLY     = 'claude-haiku-4-5'
+const MODEL_WITH_VISION   = 'claude-sonnet-4-6'
+const PRICING = {
+  'claude-haiku-4-5':  { in: 0.0000008, out: 0.000004 },  // $0.80 / $4  per MTok
+  'claude-sonnet-4-6': { in: 0.000003,  out: 0.000015 },  // $3   / $15 per MTok
+}
 
 export const STRIKES_TO_BAN_ABUSE = 3
 export const STRIKES_TO_BAN_JUNK  = 5
@@ -103,9 +110,14 @@ function recipeTextBlob({ safeRecipe, safeTags }) {
   ].join('\n')
 }
 
-// Low-level Claude moderation call. Returns { ok:false } on any failure (fail-closed)
-// or { ok:true, verdict } where verdict is the parsed JSON.
-async function callModeration(userContent, userId) {
+// Low-level Claude moderation call. Auto-picks Sonnet when the payload contains
+// an image block (array with type:'image'); otherwise Haiku for cheap text-only.
+// `endpoint` is the caller's tag for usage_log / rate-limiting — never the
+// generic 'moderate-recipe' unless the caller literally is publish/update.
+// Returns { ok:false } on any failure (fail-closed), or { ok:true, verdict }.
+async function callModeration(userContent, userId, endpoint = 'moderate-recipe') {
+  const hasImage = Array.isArray(userContent) && userContent.some(p => p?.type === 'image')
+  const model    = hasImage ? MODEL_WITH_VISION : MODEL_TEXT_ONLY
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -115,7 +127,7 @@ async function callModeration(userContent, userId) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model:      MODEL,
+        model,
         max_tokens: 256,
         system:     MODERATION_SYSTEM,
         messages:   [{ role: 'user', content: userContent }],
@@ -128,9 +140,9 @@ async function callModeration(userContent, userId) {
     const data = await response.json()
     const inTok = data.usage?.input_tokens || 0, outTok = data.usage?.output_tokens || 0
     adminInsert('usage_log', {
-      user_id: userId, endpoint: 'moderate-recipe', model: MODEL,
+      user_id: userId, endpoint, model,
       input_tokens: inTok, output_tokens: outTok,
-      cost_usd: inTok * COST_PER_INPUT_TOKEN + outTok * COST_PER_OUTPUT_TOKEN,
+      cost_usd: inTok * PRICING[model].in + outTok * PRICING[model].out,
     })
     const raw = data.content[0].text.trim().replace(/^```json?\n?/i, '').replace(/\n?```$/, '')
     return { ok: true, verdict: JSON.parse(raw) }
@@ -144,7 +156,7 @@ async function callModeration(userContent, userId) {
 // Runs before the AI rewrite and before any image generation, so genuinely bad
 // content is stopped before we spend tokens on it, and the user is judged only on
 // what they actually submitted. Returns { ok, verdict, hadImage }.
-export async function moderateRawInput({ rawText, imageBase64, userId }) {
+export async function moderateRawInput({ rawText, imageBase64, userId, endpoint }) {
   let userContent, hadImage = false
   if (imageBase64) {
     hadImage = true
@@ -155,7 +167,7 @@ export async function moderateRawInput({ rawText, imageBase64, userId }) {
   } else {
     userContent = `בדוק את הטקסט הבא שהמשתמש העלה כמתכון:\n\n${clampStr(rawText, 6000)}`
   }
-  const res = await callModeration(userContent, userId)
+  const res = await callModeration(userContent, userId, endpoint)
   return { ...res, hadImage }
 }
 
@@ -208,10 +220,12 @@ export async function recordViolation({ userId, security, verdict, hadImage, con
   const counterCol = kind === 'abuse' ? 'strikes' : 'junk_strikes'
   const current    = (kind === 'abuse' ? security?.strikes : security?.junk_strikes) || 0
 
-  // De-dup: was this exact content+kind already counted for this user in the last 24h?
+  // De-dup: was this exact content+kind already counted for this user in the last 60s?
+  // Short window — protects the legitimate double-click case but not a troll
+  // resubmitting the same rejected image every few minutes to avoid strikes.
   let willCount = counts === true
   if (willCount && contentHash) {
-    const since = new Date(Date.now() - 24 * 3600_000).toISOString()
+    const since = new Date(Date.now() - 60_000).toISOString()
     const dupes = await adminCount(
       'moderation_log',
       `user_id=eq.${userId}&content_hash=eq.${contentHash}&kind=eq.${kind}&counted=is.true&created_at=gte.${since}`

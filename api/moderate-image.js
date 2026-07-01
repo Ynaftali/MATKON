@@ -30,7 +30,9 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'banned', banned: true, banReason: 'abuse', message: 'החשבון נחסם עקב הפרות חוזרות.' })
   }
 
-  // Per-user rate limit (vision spends real tokens).
+  // Per-user rate limit (vision spends real tokens). Query on the same endpoint
+  // tag moderateRawInput logs under — earlier version checked a tag that was
+  // never written, so the limit silently did nothing.
   {
     const oneHourAgo = new Date(Date.now() - 3600_000).toISOString()
     const count = await adminCount(
@@ -47,7 +49,7 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'unavailable', message: 'השירות אינו זמין כעת. נסו שוב מאוחר יותר.' })
   }
 
-  const mod = await moderateRawInput({ rawText: null, imageBase64, userId })
+  const mod = await moderateRawInput({ rawText: null, imageBase64, userId, endpoint: 'moderate-image' })
   if (!mod.ok) {
     return res.status(503).json({ error: 'moderation_unavailable', message: 'בדיקת התוכן אינה זמינה כעת. נסו שוב.' })
   }
@@ -57,7 +59,7 @@ export default async function handler(req, res) {
       contentHash: hashContent(imageBase64),
       recipeTitle: '(החלפת תמונת מתכון)',
       snapshot:    { source: 'image_replace' },
-      counts:      mod.verdict.kind === 'abuse', // junk on image-only blocks but never strikes
+      counts:      true, // user uploaded THIS — both abuse and junk count against them
     })
     return res.status(422).json(body)
   }
