@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IconEdit, IconLock, IconShare, IconLogout, IconX, IconDownload, IconTrash } from '@tabler/icons-react'
 import { CATEGORY_GRADIENTS, countryFlag } from '../lib/mock'
-import { supabase } from '../lib/supabase'
+import { supabase, canUsePasskeys, isPasskeyCancel } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import BottomNav from '../components/BottomNav'
+import PasskeySection from '../components/PasskeySection'
 
 const COUNTRIES = [
   'ניו זילנד','אוסטרליה','ארה"ב','קנדה','בריטניה','גרמניה','צרפת','הולנד',
@@ -78,11 +79,51 @@ export default function Profile() {
   const [busy, setBusy]           = useState(false)
   const [likesCount, setLikesCount] = useState(0)
   const [savedCount, setSavedCount] = useState(0)
+  const [passkeys, setPasskeys] = useState([])
+  const [pkBusy, setPkBusy]     = useState(false)
+
+  const showPasskeys = canUsePasskeys(user)
 
   useEffect(() => {
     if (!authLoading && !user) { navigate('/login'); return }
     if (user) { loadRecipes(user.id); loadCounts(user.id) }
   }, [user, authLoading])
+
+  useEffect(() => {
+    if (privacyOpen && showPasskeys) loadPasskeys()
+  }, [privacyOpen])
+
+  async function loadPasskeys() {
+    const { data } = await supabase.auth.passkey.list()
+    setPasskeys(data || [])
+  }
+
+  async function addPasskey() {
+    setPkBusy(true)
+    const { error } = await supabase.auth.registerPasskey()
+    setPkBusy(false)
+    if (error) {
+      if (!isPasskeyCancel(error)) {
+        setToast('הפעלת הכניסה המהירה לא הצליחה')
+        setTimeout(() => setToast(''), 2500)
+      }
+      return
+    }
+    await loadPasskeys()
+    setToast('כניסה מהירה הופעלה ✓')
+    setTimeout(() => setToast(''), 2500)
+  }
+
+  async function deletePasskey(k) {
+    setPkBusy(true)
+    const { error } = await supabase.auth.passkey.delete({ passkeyId: k.id })
+    setPkBusy(false)
+    if (!error) {
+      setPasskeys(p => p.filter(x => x.id !== k.id))
+      setToast('המפתח הוסר')
+      setTimeout(() => setToast(''), 2500)
+    }
+  }
 
   async function loadCounts(userId) {
     // Recipes I liked / saved (Brief §39: "כמה מתכונים אהב").
@@ -299,6 +340,15 @@ export default function Profile() {
               <button className="btn-icon" onClick={() => !busy && setPrivacyOpen(false)}><IconX size={18} /></button>
             </div>
             <div className="drawer-body" style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+              {showPasskeys && (
+                <PasskeySection
+                  keys={passkeys}
+                  busy={pkBusy}
+                  onAdd={addPasskey}
+                  onDelete={deletePasskey}
+                />
+              )}
 
               <div style={{ border:'1px solid var(--border)', borderRadius:12, padding:'14px 16px' }}>
                 <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>

@@ -1,8 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IconChevronRight, IconEye, IconEyeOff } from '@tabler/icons-react'
-import { supabase } from '../lib/supabase'
+import { supabase, canUsePasskeys, isPasskeyCancel } from '../lib/supabase'
+import { armConditionalPasskey } from '../lib/passkeys'
 import SsoButtons from '../components/SsoButtons'
+import PasskeyOfferModal from '../components/PasskeyOfferModal'
+
+const PASSKEY_OFFER_SEEN = 'matkon_passkey_offer_seen'
 
 export default function Login() {
   const navigate = useNavigate()
@@ -10,7 +14,25 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPw, setShowPw]   = useState(false)
+  const [offer, setOffer]         = useState(false)
+  const [offerBusy, setOfferBusy] = useState(false)
+  const [offerError, setOfferError] = useState('')
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
+
+  // Passkey autofill: if this device holds a passkey for matkon.co, the OS
+  // offers it on the email field (Face ID / fingerprint) — no button needed.
+  useEffect(() => {
+    const ctrl = new AbortController()
+    armConditionalPasskey({
+      signal: ctrl.signal,
+      onSignedIn: () => {
+        localStorage.setItem(PASSKEY_OFFER_SEEN, '1')
+        navigate('/feed')
+      },
+      onError: () => setError('הכניסה המהירה לא הצליחה. אפשר לנסות שוב או להיכנס עם סיסמה.'),
+    })
+    return () => ctrl.abort()
+  }, [])
 
   const submit = async e => {
     e.preventDefault()
@@ -34,6 +56,31 @@ export default function Login() {
       }
       localStorage.setItem('matkon_bio_prompt_seen', '1')
     }
+    // They just typed a password — the exact pain a passkey removes. Offer
+    // once (per device) to accounts that can register one and haven't yet.
+    if (canUsePasskeys(data?.user) && !localStorage.getItem(PASSKEY_OFFER_SEEN)) {
+      const { data: keys } = await supabase.auth.passkey.list()
+      if (!keys?.length) { setOffer(true); return }
+      localStorage.setItem(PASSKEY_OFFER_SEEN, '1')
+    }
+    navigate('/feed')
+  }
+
+  async function enablePasskey() {
+    setOfferError('')
+    setOfferBusy(true)
+    const { error } = await supabase.auth.registerPasskey()
+    setOfferBusy(false)
+    if (error && !isPasskeyCancel(error)) {
+      setOfferError('לא הצלחנו להפעיל את הכניסה המהירה. אפשר לנסות שוב מאוחר יותר דרך הפרופיל.')
+      return
+    }
+    dismissOffer()
+  }
+
+  function dismissOffer() {
+    localStorage.setItem(PASSKEY_OFFER_SEEN, '1')
+    setOffer(false)
     navigate('/feed')
   }
 
@@ -55,13 +102,14 @@ export default function Login() {
       <form className="auth-form" onSubmit={submit}>
         <div className="auth-field">
           <label className="auth-label">אימייל</label>
-          <input className="input" type="email" placeholder="your@email.com" value={form.email} onChange={set('email')} required />
+          {/* "webauthn" token lets iOS/Android surface passkeys in the autofill bar */}
+          <input className="input" type="email" placeholder="your@email.com" value={form.email} onChange={set('email')} required autoComplete="username webauthn" />
         </div>
 
         <div className="auth-field">
           <label className="auth-label">סיסמה</label>
           <div className="input-wrap">
-            <input className="input" type={showPw ? 'text' : 'password'} placeholder="הסיסמה שלכם" value={form.password} onChange={set('password')} required />
+            <input className="input" type={showPw ? 'text' : 'password'} placeholder="הסיסמה שלכם" value={form.password} onChange={set('password')} required autoComplete="current-password" />
             <button type="button" className="input-eye" onClick={() => setShowPw(s => !s)} aria-label={showPw ? 'הסתירו סיסמה' : 'הציגו סיסמה'}>
               {showPw ? <IconEyeOff size={18} /> : <IconEye size={18} />}
             </button>
@@ -78,6 +126,15 @@ export default function Login() {
 
         <SsoButtons />
       </form>
+
+      {offer && (
+        <PasskeyOfferModal
+          busy={offerBusy}
+          error={offerError}
+          onEnable={enablePasskey}
+          onDismiss={dismissOffer}
+        />
+      )}
 
       <div className="auth-footer">
         עדיין אין לכם חשבון? <a onClick={() => navigate('/register')}>הצטרפות לקהילה</a>

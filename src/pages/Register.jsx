@@ -85,11 +85,11 @@ export default function Register() {
         <div className="auth-row">
           <div className="auth-field">
             <label className="auth-label">שם פרטי</label>
-            <input className="input" placeholder="ישראל" value={form.firstName} onChange={set('firstName')} required />
+            <input className="input" placeholder="ישראל" value={form.firstName} onChange={set('firstName')} required autoComplete="given-name" />
           </div>
           <div className="auth-field">
             <label className="auth-label">שם משפחה</label>
-            <input className="input" placeholder="ישראלי" value={form.lastName} onChange={set('lastName')} required />
+            <input className="input" placeholder="ישראלי" value={form.lastName} onChange={set('lastName')} required autoComplete="family-name" />
           </div>
         </div>
 
@@ -111,7 +111,7 @@ export default function Register() {
         <div className="auth-field">
           <label className="auth-label">סיסמה</label>
           <div className="input-wrap">
-            <input className="input" type={showPw ? 'text' : 'password'} placeholder="צרו סיסמה חזקה" value={form.password} onChange={set('password')} required />
+            <input className="input" type={showPw ? 'text' : 'password'} placeholder="צרו סיסמה חזקה" value={form.password} onChange={set('password')} required autoComplete="new-password" />
             <button type="button" className="input-eye" onClick={() => setShowPw(s => !s)} aria-label={showPw ? 'הסתירו סיסמה' : 'הציגו סיסמה'}>
               {showPw ? <IconEyeOff size={18} /> : <IconEye size={18} />}
             </button>
@@ -131,7 +131,7 @@ export default function Register() {
         <div className="auth-field">
           <label className="auth-label">אימות סיסמה</label>
           <div className="input-wrap">
-            <input className="input" type={showPw2 ? 'text' : 'password'} placeholder="חזרו על הסיסמה" value={form.confirm} onChange={set('confirm')} required />
+            <input className="input" type={showPw2 ? 'text' : 'password'} placeholder="חזרו על הסיסמה" value={form.confirm} onChange={set('confirm')} required autoComplete="new-password" />
             <button type="button" className="input-eye" onClick={() => setShowPw2(s => !s)} aria-label={showPw2 ? 'הסתירו סיסמה' : 'הציגו סיסמה'}>
               {showPw2 ? <IconEyeOff size={18} /> : <IconEye size={18} />}
             </button>
