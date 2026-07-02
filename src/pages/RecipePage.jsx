@@ -90,11 +90,18 @@ export default function RecipePage() {
     }
     setLoading(false)
     loadComments(id)
-    if (currentUser) {
+  }
+
+  // Liked/saved state depends on both the recipe id AND the async auth
+  // resolution — on a fresh page load loadRecipe() runs before AuthContext
+  // has a user (stale closure), so this must be its own effect keyed on the
+  // user. Without it the heart/bookmark always render empty after a reload.
+  useEffect(() => {
+    if (currentUser?.id) {
       loadLike(id)
       loadSaved(id)
     }
-  }
+  }, [currentUser?.id, id])
 
   async function loadLike(recipeId) {
     const { data } = await supabase
@@ -121,13 +128,14 @@ export default function RecipePage() {
     if (saveLoading) return
     setSaveLoading(true)
     if (saved) {
-      await supabase.from('saved').delete().eq('recipe_id', id).eq('user_id', currentUser.id)
-      setSaved(false)
-      showToast('הוסר מהשמורים')
+      const { error } = await supabase.from('saved').delete().eq('recipe_id', id).eq('user_id', currentUser.id)
+      if (error) showToast('שגיאה, נסו שוב')
+      else { setSaved(false); showToast('הוסר מהשמורים') }
     } else {
-      await supabase.from('saved').insert({ recipe_id: id, user_id: currentUser.id })
-      setSaved(true)
-      showToast('נשמר ✓')
+      const { error } = await supabase.from('saved').insert({ recipe_id: id, user_id: currentUser.id })
+      // 23505 = already saved (e.g. from another device) — that's a success state
+      if (error && error.code !== '23505') showToast('שגיאה, נסו שוב')
+      else { setSaved(true); showToast('נשמר ✓') }
     }
     setSaveLoading(false)
   }
@@ -173,11 +181,14 @@ export default function RecipePage() {
     if (likeLoading) return
     setLikeLoading(true)
     if (liked) {
-      await supabase.from('likes').delete().eq('recipe_id', id).eq('user_id', currentUser.id)
-      setLiked(false)
+      const { error } = await supabase.from('likes').delete().eq('recipe_id', id).eq('user_id', currentUser.id)
+      if (error) showToast('שגיאה, נסו שוב')
+      else setLiked(false)
     } else {
-      await supabase.from('likes').insert({ recipe_id: id, user_id: currentUser.id })
-      setLiked(true)
+      const { error } = await supabase.from('likes').insert({ recipe_id: id, user_id: currentUser.id })
+      // 23505 = already liked (e.g. from another device) — that's a success state
+      if (error && error.code !== '23505') showToast('שגיאה, נסו שוב')
+      else setLiked(true)
     }
     setLikeLoading(false)
   }
