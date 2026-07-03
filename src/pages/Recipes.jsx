@@ -13,15 +13,17 @@ const TABS = [
   { id: 'liked',     label: 'אהבתי'         },
 ]
 
-// Countries for community filter
+// Countries for community filter. `code` must match the value stored in
+// users.country — which is the Hebrew name chosen at onboarding, NOT an English
+// code (the query filters `.eq('users.country', code)` directly against the DB).
 const COUNTRY_FILTERS = [
-  { code: null, label: '🌍 כולם' },
-  { code: 'Germany', label: '🇩🇪 גרמניה' },
-  { code: 'United States', label: '🇺🇸 ארה״ב' },
-  { code: 'United Kingdom', label: '🇬🇧 בריטניה' },
-  { code: 'France', label: '🇫🇷 צרפת' },
-  { code: 'Australia', label: '🇦🇺 אוסטרליה' },
-  { code: 'Canada', label: '🇨🇦 קנדה' },
+  { code: null,        label: '🌍 כולם' },
+  { code: 'גרמניה',    label: '🇩🇪 גרמניה' },
+  { code: 'ארה"ב',     label: '🇺🇸 ארה״ב' },
+  { code: 'בריטניה',   label: '🇬🇧 בריטניה' },
+  { code: 'צרפת',      label: '🇫🇷 צרפת' },
+  { code: 'אוסטרליה',  label: '🇦🇺 אוסטרליה' },
+  { code: 'קנדה',      label: '🇨🇦 קנדה' },
 ]
 
 function RecipeCard({ recipe, onClick }) {
@@ -117,11 +119,15 @@ export default function Recipes() {
   const loadCommunity = useCallback(async (pageNum = 0, reset = false) => {
     if (reset) setLoading(true); else setCommLoadingMore(true)
     const from = pageNum * PAGE_SIZE
+    // When filtering by country the join must be inner — a plain embedded filter
+    // (`.eq('users.country', …)`) only nulls the embed of non-matching authors,
+    // it does NOT drop the parent recipe rows. `users!inner` makes it filter rows.
+    const userJoin = communityCountry ? 'users!inner(full_name, country)' : 'users(full_name, country)'
     let query = supabase
       .from('recipes')
       .select(`
         id, title, category, image_url, created_at,
-        users(full_name, country),
+        ${userJoin},
         likes(count),
         recipe_comments(count)
       `)
@@ -130,7 +136,7 @@ export default function Recipes() {
       .range(from, from + PAGE_SIZE - 1)
 
     if (communityCountry) {
-      // Filter by users who live in this country
+      // Filter by users who live in this country (stored as the Hebrew name)
       query = query.eq('users.country', communityCountry)
     }
 
