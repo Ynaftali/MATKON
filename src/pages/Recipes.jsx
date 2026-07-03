@@ -142,7 +142,14 @@ export default function Recipes() {
 
     const { data } = await query
     if (data) {
-      setCommunity(prev => reset ? data : [...prev, ...data])
+      // Dedupe by id: StrictMode/observer timing can re-fire an append of a page
+      // already loaded, which would render the same recipe twice (duplicate-key
+      // warning). Merging by id keeps the list correct regardless of double-loads.
+      setCommunity(prev => {
+        const base = reset ? [] : prev
+        const seen = new Set(base.map(r => r.id))
+        return [...base, ...data.filter(r => !seen.has(r.id))]
+      })
       setCommHasMore(data.length === PAGE_SIZE)
     }
     setLoading(false); setCommLoadingMore(false)
