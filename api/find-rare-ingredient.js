@@ -109,11 +109,15 @@ If you cannot find any real stores after searching, return an empty array: []`
       cost_usd:      costUsd,
     })
 
-    const textBlock = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('')
-    const raw = textBlock.trim().replace(/^```json?\n?/i, '').replace(/\n?```$/, '')
+    // Haiku frequently wraps the JSON in prose after a web search (e.g. "Based on
+    // my search, here are stores: [...]") and may split it across several text
+    // blocks — so parsing the whole concatenated blob throws and we'd drop real
+    // results. Extract the JSON array substring itself instead.
+    const textBlock = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n')
+    const match = textBlock.match(/\[[\s\S]*\]/)
 
     let stores = []
-    try { stores = JSON.parse(raw) } catch { stores = [] }
+    if (match) { try { stores = JSON.parse(match[0]) } catch { stores = [] } }
     if (!Array.isArray(stores)) stores = []
     stores = stores
       .filter(s => s && typeof s.url === 'string' && /^https?:\/\//i.test(s.url) && typeof s.name === 'string')
