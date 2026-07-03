@@ -14,6 +14,30 @@ const COUNTRIES = [
   'סינגפור','הודו','יפן','דרום אפריקה','ברזיל','ארגנטינה','מקסיקו','ישראל','אחר',
 ]
 
+function ProfileRecipeItem({ recipe, onClick }) {
+  const gradient = CATEGORY_GRADIENTS[recipe.category] || 'linear-gradient(160deg,#1e3a6e,#3d6fa8)'
+  const bgStyle  = recipe.image_url
+    ? { backgroundImage:`url(${recipe.image_url})`, backgroundSize:'cover', backgroundPosition:'center' }
+    : { background: gradient }
+  return (
+    <div className="profile-recipe-item" onClick={onClick}>
+      <div className="profile-recipe-thumb">
+        <div className="profile-recipe-thumb-bg" style={bgStyle} />
+      </div>
+      <div className="profile-recipe-info">
+        <div className="profile-recipe-title">{recipe.title}</div>
+        <div className="profile-recipe-meta">{recipe.category} · {(recipe.prep_time||0)+(recipe.cook_time||0)} דקות</div>
+        <div className="profile-recipe-tags">
+          {!recipe.is_public
+            ? <span className="tag tag-blue"><IconLock size={10} /> אישי</span>
+            : <span className="tag tag-green"><IconShare size={10} /> משותף</span>
+          }
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function EditModal({ profile, onClose, onSave }) {
   const [form, setForm] = useState({
     full_name: profile?.full_name || '',
@@ -72,6 +96,8 @@ export default function Profile() {
   const [tab, setTab]             = useState('mine')
   const [recipes, setRecipes]     = useState([])
   const [recipesLoading, setRecipesLoading] = useState(false)
+  const [saved, setSaved]         = useState([])
+  const [savedLoading, setSavedLoading] = useState(false)
   const [editOpen, setEditOpen]   = useState(false)
   const [toast, setToast]         = useState('')
   const [privacyOpen, setPrivacyOpen] = useState(false)
@@ -86,7 +112,7 @@ export default function Profile() {
 
   useEffect(() => {
     if (!authLoading && !user) { navigate('/login'); return }
-    if (user) { loadRecipes(user.id); loadCounts(user.id) }
+    if (user) { loadRecipes(user.id); loadSaved(user.id); loadCounts(user.id) }
   }, [user, authLoading])
 
   useEffect(() => {
@@ -144,6 +170,24 @@ export default function Profile() {
       .order('created_at', { ascending: false })
     setRecipes(data || [])
     setRecipesLoading(false)
+  }
+
+  // Recipes the user bookmarked (Recipes.jsx loadSaved pattern): saved → recipe_ids → recipes.
+  async function loadSaved(userId) {
+    setSavedLoading(true)
+    const { data: savedRows } = await supabase
+      .from('saved')
+      .select('recipe_id')
+      .eq('user_id', userId)
+    const ids = (savedRows || []).map(s => s.recipe_id)
+    if (!ids.length) { setSaved([]); setSavedLoading(false); return }
+    const { data } = await supabase
+      .from('recipes')
+      .select('*')
+      .in('id', ids)
+      .order('created_at', { ascending: false })
+    setSaved(data || [])
+    setSavedLoading(false)
   }
 
   async function saveProfile(form) {
@@ -293,36 +337,24 @@ export default function Profile() {
           </div>
         )}
 
-        {tab === 'mine' && recipes.map(r => {
-          const gradient = CATEGORY_GRADIENTS[r.category] || 'linear-gradient(160deg,#1e3a6e,#3d6fa8)'
-          const bgStyle  = r.image_url
-            ? { backgroundImage:`url(${r.image_url})`, backgroundSize:'cover', backgroundPosition:'center' }
-            : { background: gradient }
-          return (
-            <div key={r.id} className="profile-recipe-item" onClick={() => navigate(`/recipe/${r.id}`)}>
-              <div className="profile-recipe-thumb">
-                <div className="profile-recipe-thumb-bg" style={bgStyle} />
-              </div>
-              <div className="profile-recipe-info">
-                <div className="profile-recipe-title">{r.title}</div>
-                <div className="profile-recipe-meta">{r.category} · {(r.prep_time||0)+(r.cook_time||0)} דקות</div>
-                <div className="profile-recipe-tags">
-                  {!r.is_public
-                    ? <span className="tag tag-blue"><IconLock size={10} /> אישי</span>
-                    : <span className="tag tag-green"><IconShare size={10} /> משותף</span>
-                  }
-                </div>
-              </div>
-            </div>
-          )
-        })}
+        {tab === 'mine' && recipes.map(r => (
+          <ProfileRecipeItem key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`)} />
+        ))}
 
-        {tab === 'saved' && (
+        {tab === 'saved' && savedLoading && (
+          <p style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>טוענים...</p>
+        )}
+
+        {tab === 'saved' && !savedLoading && saved.length === 0 && (
           <div style={{ textAlign:'center', padding:'60px 24px', color:'var(--text-muted)' }}>
             <div style={{ fontSize:'2.5rem', marginBottom:12 }}>🔖</div>
             <p>עדיין אין מתכונים שמורים</p>
           </div>
         )}
+
+        {tab === 'saved' && saved.map(r => (
+          <ProfileRecipeItem key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`)} />
+        ))}
 
         <button
           onClick={() => { setPrivacyOpen(true); setConfirmText('') }}
