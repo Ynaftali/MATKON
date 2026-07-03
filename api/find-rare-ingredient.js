@@ -1,5 +1,6 @@
 import { adminInsert, adminCount, adminSelect, getUserFromToken } from './_supabase.js'
 import { checkAiBudget } from './_budget.js'
+import { resolveCountry } from './_countries.js'
 
 export const config = { runtime: 'nodejs' }
 
@@ -27,7 +28,11 @@ export default async function handler(req, res) {
   }
 
   const ingredient = normalize(req.body?.ingredient)
-  const country = normalize(req.body?.country)
+  // country arrives in Hebrew ("ניו זילנד"); resolve to the English name so the
+  // web search targets real stores, and use it as the cache key (so all users in
+  // a country share one cached result regardless of how the client spelled it).
+  const { en, lang } = resolveCountry(req.body?.country)
+  const country = normalize(en)
   if (!ingredient || !country) {
     return res.status(400).json({ error: 'Missing ingredient or country' })
   }
@@ -82,7 +87,7 @@ If you cannot find any real stores after searching, return an empty array: []`
         tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
         messages: [{
           role: 'user',
-          content: `Ingredient: ${ingredient}\nCountry: ${country}\n\nSearch for real stores (online, or with delivery) in ${country} where this specific ingredient can be purchased.`,
+          content: `Ingredient (may be written in Hebrew): ${ingredient}\nCountry: ${en}\nLocal language: ${lang}\n\nFirst determine this ingredient's common name in ${lang} or English. Then use web_search to find real stores (online, or with delivery) in ${en} where it can be purchased. Search using the local/English ingredient name — never the Hebrew text.`,
         }],
       }),
     })

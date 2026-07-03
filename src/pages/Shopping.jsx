@@ -60,7 +60,15 @@ export default function Shopping() {
   useEffect(() => {
     const country = profile?.country
     const uncheckedItems = items.filter(i => !i.checked)
-    const needsTranslation = uncheckedItems.some(i => !i.name_local || !i.category || i.category === 'other')
+    // Users abroad want name_local in the local language. If an item still holds
+    // a Hebrew name_local (older cache, or a translation that came back in Hebrew),
+    // re-translate it — otherwise it just shows Hebrew twice.
+    const wantsLocalName = country && country !== 'ישראל'
+    const hasHebrew = s => /[֐-׿]/.test(s || '')
+    const needsTranslation = uncheckedItems.some(i =>
+      !i.name_local || !i.category || i.category === 'other' ||
+      (wantsLocalName && hasHebrew(i.name_local))
+    )
     if (!country || !needsTranslation || uncheckedItems.length === 0) return
 
     async function doTranslate() {
