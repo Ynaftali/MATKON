@@ -1,14 +1,30 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { IconTrash, IconShare, IconCheck, IconShoppingCart, IconArchive, IconArrowBackUp, IconX, IconChevronDown, IconExternalLink } from '@tabler/icons-react'
 import {
   getShoppingList, getDeletedShoppingItems,
-  toggleShoppingItem, moveCheckedToDeleted, clearAll,
+  toggleShoppingItem, moveCheckedToDeleted, setAllShoppingChecked,
   restoreDeletedItem, permanentlyDeleteItem, clearDeletedLibrary,
   updateItemsEnrichment, groupByCategory, SHOPPING_CATEGORIES,
 } from '../lib/shopping'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
 import BottomNav from '../components/BottomNav'
+import AppHeader from '../components/AppHeader'
+
+// Piece-count units read wrong in Hebrew ("1 יח׳ בצל"). Show just the number for
+// piece-counted items ("1 בצל", "6 ביצים"); spices need no quantity at all
+// ("כמון"); mass/volume (גרם/ק״ג/מ״ל) is kept as-is ("200 גרם גבינה").
+const PIECE_UNITS       = /^(יח['׳]?|יחידה|יחידות)$/
+const SMALL_SPICE_UNITS = /^(כף|כפות|כפית|כפיות|קורט|קמצוץ)$/
+function qtyPrefix(item) {
+  const unit    = (item.unit || '').trim()
+  const isPiece = unit === '' || PIECE_UNITS.test(unit)
+  if (item.category === 'spices' && (isPiece || SMALL_SPICE_UNITS.test(unit))) return ''
+  if (!(item.qty > 0)) return ''
+  if (isPiece) return `${item.qty} `
+  return `${item.qty} ${unit} `
+}
 
 export default function Shopping() {
   const [items, setItems]           = useState(getShoppingList)
@@ -17,6 +33,7 @@ export default function Shopping() {
   const [translating, setTranslating] = useState(false)
   const [rareStores, setRareStores] = useState({}) // { [itemId]: { open, loading, stores, error } }
   const { profile } = useAuth()
+  const navigate = useNavigate()
 
   async function toggleRareStores(itemId, ingredientName) {
     const current = rareStores[itemId]
@@ -108,19 +125,17 @@ export default function Shopping() {
 
   const unchecked = items.filter(i => !i.checked)
   const checked   = items.filter(i => i.checked)
-  const groups    = groupByCategory(unchecked)
+  // Show all items grouped; a marked (checked) item stays inline, struck through,
+  // until the user deletes the marked set — so you see what you're about to remove.
+  const groups    = groupByCategory(items)
+  const allSelected = items.length > 0 && checked.length === items.length
 
   function toggle(id) { setItems(toggleShoppingItem(id)) }
-  function archiveChecked() {
+  function toggleSelectAll() { setItems(setAllShoppingChecked(!allSelected)) }
+  function deleteSelected() {
+    // Marked items move to the deleted library (restorable) — not purged.
     const { items: newItems, deleted: newDeleted } = moveCheckedToDeleted()
     setItems(newItems); setDeleted(newDeleted)
-  }
-  function clear() {
-    if (window.confirm('להעביר את כל הרשימה לספריית המחוקים? (אפשר לשחזר משם)')) {
-      clearAll()
-      setItems(getShoppingList())
-      setDeleted(getDeletedShoppingItems())
-    }
   }
   function restore(id) {
     const { items: newItems, deleted: newDeleted } = restoreDeletedItem(id)
@@ -135,7 +150,7 @@ export default function Shopping() {
 
   function shareList() {
     const lines = []
-    for (const group of groups) {
+    for (const group of groupByCategory(unchecked)) {
       lines.push(`*${group.icon} ${group.label}*`)
       for (const i of group.items) {
         const q   = i.qty > 0 ? `${i.qty} ${i.unit} ` : ''
@@ -151,22 +166,7 @@ export default function Shopping() {
 
   return (
     <div className="page page-with-nav">
-      <div className="topbar">
-        <div style={{ width: 40 }} />
-        <span className="topbar-title">רשימת קניות</span>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {unchecked.length > 0 && (
-            <button className="btn-icon" onClick={shareList} title="שתפו/ייצאו">
-              <IconShare size={20} />
-            </button>
-          )}
-          {checked.length > 0 && (
-            <button className="btn-icon" onClick={archiveChecked} title="העברה לספריית מחוקים">
-              <IconArchive size={20} />
-            </button>
-          )}
-        </div>
-      </div>
+      <AppHeader title="רשימת קניות" compact />
 
       <div className="page-scroll" style={{ padding: '0 16px 24px' }}>
         {items.length === 0 && deleted.length === 0 && (
@@ -183,12 +183,23 @@ export default function Shopping() {
           </p>
         )}
 
+        {items.length > 0 && (
+          <div className="shopping-list-actions">
+            <label className="shopping-select-all">
+              <span className={`shopping-check ${allSelected ? 'checked' : ''}`}>{allSelected ? <IconCheck size={14} /> : ''}</span>
+              <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} style={{ display: 'none' }} />
+              <span>סימון הכל</span>
+            </label>
+            <button className="shopping-share-btn" onClick={shareList}>
+              <IconShare size={18} /> שיתוף
+            </button>
+          </div>
+        )}
+
         {groups.map(group => (
           <div key={group.key} className="shopping-group">
             <div className="shopping-group-head">
-              <span className="shopping-group-icon">{group.icon}</span>
               <span className="shopping-group-label">{group.label}</span>
-              <span className="shopping-group-count">{group.items.length}</span>
             </div>
             {group.items.map(item => (
               <ShoppingRow key={item.id} item={item} onToggle={toggle} rare={rareStores[item.id]} onToggleRare={toggleRareStores} />
@@ -197,25 +208,12 @@ export default function Shopping() {
         ))}
 
         {checked.length > 0 && (
-          <div className="shopping-group" style={{ marginTop: 18, opacity: .8 }}>
-            <div className="shopping-group-head">
-              <span className="shopping-group-icon">✓</span>
-              <span className="shopping-group-label">נרכשו</span>
-              <span className="shopping-group-count">{checked.length}</span>
-            </div>
-            {checked.map(item => (
-              <ShoppingRow key={item.id} item={item} onToggle={toggle} rare={rareStores[item.id]} onToggleRare={toggleRareStores} />
-            ))}
-          </div>
-        )}
-
-        {items.length > 0 && (
           <button
-            className="btn btn-ghost btn-sm"
-            style={{ marginTop: 16, color: 'var(--text-muted)' }}
-            onClick={clear}
+            className="btn btn-glossy btn-glossy-red"
+            style={{ marginTop: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+            onClick={deleteSelected}
           >
-            ניקוי הרשימה
+            <IconTrash size={18} /> מחיקת פריטים מסומנים ({checked.length})
           </button>
         )}
 
@@ -250,8 +248,7 @@ export default function Shopping() {
                 <div key={item.id} className="shopping-deleted-row">
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div className="shopping-name" style={{ wordBreak: 'break-word' }}>
-                      {item.qty > 0 ? `${item.qty}${item.unit ? ' ' + item.unit : ''} ` : ''}
-                      <strong>{item.name}</strong>
+                      {qtyPrefix(item)}<strong>{item.name}</strong>
                     </div>
                     {item.name_local && item.name_local !== item.name && (
                       <div style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>{item.name_local}</div>
@@ -285,10 +282,9 @@ export default function Shopping() {
 }
 
 function ShoppingRow({ item, onToggle, rare, onToggleRare }) {
-  const unit      = item.unit && item.unit !== item.name ? item.unit : ''
-  const qtyStr    = item.qty > 0 ? `${item.qty}${unit ? ' ' + unit : ''} ` : ''
+  const qtyStr    = qtyPrefix(item)
   const localName = item.name_local
-  const localStr  = localName && localName !== item.name ? ` · ${localName}` : ''
+  const hasLocal  = localName && localName !== item.name
   const isRare    = !!item.where_to_buy
 
   return (
@@ -304,7 +300,7 @@ function ShoppingRow({ item, onToggle, rare, onToggleRare }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="shopping-name" style={{ wordBreak: 'break-word' }}>
             {qtyStr}<strong>{item.name}</strong>
-            <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>{localStr}</span>
+            {hasLocal && <span className="shopping-name-local"> | {localName}</span>}
           </div>
           {isRare && (
             <button
@@ -316,11 +312,6 @@ function ShoppingRow({ item, onToggle, rare, onToggleRare }) {
               📍 איפה למצוא
               <IconChevronDown size={12} className={rare?.open ? 'rare-chevron open' : 'rare-chevron'} />
             </button>
-          )}
-          {item.recipes?.length > 0 && (
-            <div style={{ fontSize: '.72rem', color: 'var(--green)', marginTop: 3 }}>
-              מתכון: {item.recipes.join(' · ')}
-            </div>
           )}
         </div>
       </div>

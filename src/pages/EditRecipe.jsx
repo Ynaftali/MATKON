@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
-  IconChevronRight, IconCamera, IconPlus, IconX, IconTrash,
+  IconCamera, IconPlus, IconX, IconTrash,
   IconAlertTriangle, IconWorld, IconLock,
 } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import { compressImage } from '../lib/compressImage'
 import ImageRejectionModal from '../components/ImageRejectionModal'
+import BottomNav from '../components/BottomNav'
+import AppHeader from '../components/AppHeader'
 
 // Normalize stored ingredients (mock {name_he,quantity} or AI {name,amount}) to one editable shape.
 const normIngredients = arr => (Array.isArray(arr) ? arr : []).map(i => ({
@@ -41,6 +43,7 @@ export default function EditRecipe() {
   const [steps, setSteps]             = useState([])
   const [tags, setTags]               = useState([])
   const [newTag, setNewTag]           = useState('')
+  const [allTags, setAllTags]         = useState([])   // existing community tags, for autocomplete
   const [isPublic, setIsPublic]       = useState(false)
   const [sourceUrl, setSourceUrl]     = useState(null)
   const [imageUrl, setImageUrl]       = useState(null)
@@ -96,10 +99,28 @@ export default function EditRecipe() {
   const addStep = () => setSteps(arr => [...arr, { text: '', duration_seconds: null }])
   const delStep = idx => setSteps(arr => arr.filter((_, i) => i !== idx))
 
-  function addTag() {
-    const t = newTag.trim()
-    if (t && !tags.includes(t)) { setTags(arr => [...arr, t]); setNewTag('') }
+  // Pull existing community tags (most-used first) so the input can suggest them —
+  // keeps tags consistent instead of "צמחוני"/"צמחונית" duplicates. Mirrors AddRecipe.
+  useEffect(() => {
+    supabase.from('recipes').select('tags').eq('is_public', true).limit(500).then(({ data }) => {
+      const counts = {}
+      ;(data || []).forEach(r => (r.tags || []).forEach(t => {
+        const k = (t || '').trim()
+        if (k) counts[k] = (counts[k] || 0) + 1
+      }))
+      setAllTags(Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([t]) => t))
+    })
+  }, [])
+
+  function addTag(value) {
+    const t = (value ?? newTag).trim()
+    if (t && !tags.includes(t)) setTags(arr => [...arr, t])
+    setNewTag('')
   }
+
+  const tagSuggestions = newTag.trim()
+    ? allTags.filter(t => t.includes(newTag.trim()) && !tags.includes(t)).slice(0, 6)
+    : []
 
   function pickImage(e) {
     const file = e.target.files[0]
@@ -228,21 +249,17 @@ export default function EditRecipe() {
     </div>
   )
 
-  const fieldLabel = { fontSize:'.78rem', color:'var(--text-muted)', display:'block', marginBottom:4 }
+  const fieldLabel = { fontSize:'.78rem', color:'var(--yellow-l)', display:'block', marginBottom:4 }
   const previewSrc = imagePreview || imageUrl
 
   return (
-    <div className="add-page">
-      <div className="topbar">
-        <button className="btn-icon" onClick={() => navigate(-1)}><IconChevronRight size={20} /></button>
-        <span className="topbar-title">עריכת מתכון</span>
-        <div style={{ width: 40 }} />
-      </div>
+    <div className="add-page page-with-nav">
+      <AppHeader title="עריכת מתכון" />
 
       <div className="add-body">
         {/* Image */}
-        <div style={{ position:'relative', height:140, borderRadius:16, background:'var(--bg-mid)', overflow:'hidden', backgroundImage: previewSrc ? `url(${previewSrc})` : 'none', backgroundSize:'cover', backgroundPosition:'center' }}>
-          <button className="btn btn-ghost btn-sm" style={{ position:'absolute', bottom:8, insetInlineStart:8, width:'auto', padding:'8px 12px' }} onClick={() => imgRef.current?.click()} type="button">
+        <div className="recipe-img-preview" style={{ backgroundImage: previewSrc ? `url(${previewSrc})` : 'none', backgroundColor:'var(--bg-mid)' }}>
+          <button className="recipe-img-change" onClick={() => imgRef.current?.click()} type="button">
             <IconCamera size={16} /> החלף תמונה
           </button>
           <input ref={imgRef} type="file" accept="image/*" style={{ display:'none' }} onChange={pickImage} />
@@ -251,13 +268,13 @@ export default function EditRecipe() {
         {/* Title */}
         <div>
           <label style={fieldLabel}>כותרת</label>
-          <input className="input" value={title} onChange={e => setTitle(e.target.value)} placeholder="שם המתכון" />
+          <input className="input" maxLength={200} value={title} onChange={e => setTitle(e.target.value)} placeholder="שם המתכון" />
         </div>
 
         {/* Description */}
         <div>
           <label style={fieldLabel}>תיאור</label>
-          <textarea className="input input-textarea" style={{ minHeight:90 }} value={description} onChange={e => setDescription(e.target.value)} placeholder="תיאור קצר" />
+          <textarea className="input input-textarea" maxLength={2000} style={{ minHeight:120 }} value={description} onChange={e => setDescription(e.target.value)} placeholder="תיאור קצר" />
         </div>
 
         {/* Numbers + level */}
@@ -296,10 +313,14 @@ export default function EditRecipe() {
         {/* Steps */}
         <div>
           <div className="section-title">שלבי הכנה</div>
+          <p className="add-hint" style={{ marginBottom: 10 }}>
+            אם תזינו זמן בשלב הכנה, ניצור טיימר אוטומטי לבישול.<br />
+            הימנעו מלחזור על אותו זמן בשלבים עוקבים.
+          </p>
           {steps.map((step, idx) => (
             <div key={idx} style={{ display:'flex', gap:6, alignItems:'flex-start', marginBottom:6 }}>
               <span style={{ color:'var(--blue-light)', fontSize:'.85rem', marginTop:11, flexShrink:0, width:16 }}>{idx + 1}.</span>
-              <textarea className="input" style={{ flex:1, minHeight:44, padding:'8px 10px', resize:'vertical' }} placeholder={`שלב ${idx + 1}`} value={step.text} onChange={e => setStepText(idx, e.target.value)} />
+              <textarea className="input" style={{ flex:1, minHeight:44, padding:'8px 10px', resize:'none' }} placeholder={`שלב ${idx + 1}`} value={step.text} onChange={e => setStepText(idx, e.target.value)} />
               <button className="btn-icon" style={{ color:'var(--red)', flexShrink:0 }} onClick={() => delStep(idx)} aria-label="הסר שלב"><IconX size={16} /></button>
             </div>
           ))}
@@ -320,8 +341,15 @@ export default function EditRecipe() {
           </div>
           <div className="tag-add-input">
             <input className="input" placeholder="הוסיפו תגית..." value={newTag} onChange={e => setNewTag(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTag()} style={{ height:40, padding:'8px 12px' }} />
-            <button className="btn btn-ghost btn-sm" onClick={addTag} style={{ width:'auto', padding:'8px 14px' }}><IconPlus size={16} /></button>
+            <button className="btn btn-ghost btn-sm" onClick={() => addTag()} style={{ width:'auto', padding:'8px 14px' }}><IconPlus size={16} /></button>
           </div>
+          {tagSuggestions.length > 0 && (
+            <div className="tag-suggestions">
+              {tagSuggestions.map(t => (
+                <button key={t} type="button" className="tag-suggestion" onClick={() => addTag(t)}>{t}</button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="divider" />
@@ -331,14 +359,14 @@ export default function EditRecipe() {
           <div className="section-title">מי רואה את המתכון</div>
           <div className="visibility-opts">
             <div className={`vis-opt ${isPublic ? 'selected' : ''}`} onClick={() => setIsPublic(true)}>
-              <IconWorld size={22} color={isPublic ? 'var(--blue-light)' : 'var(--text-muted)'} />
+              <IconWorld size={22} color="var(--green)" />
               <div className="vis-opt-text">
                 <div className="vis-opt-title">שיתוף עם הקהילה</div>
                 <div className="vis-opt-desc">כולם יוכלו לראות ולבשל את המתכון שלכם</div>
               </div>
             </div>
             <div className={`vis-opt ${!isPublic ? 'selected' : ''}`} onClick={() => setIsPublic(false)}>
-              <IconLock size={22} color={!isPublic ? 'var(--blue-light)' : 'var(--text-muted)'} />
+              <IconLock size={22} color="#a78bff" />
               <div className="vis-opt-text">
                 <div className="vis-opt-title">שמירה אישית</div>
                 <div className="vis-opt-desc">רק אתם תראו את המתכון</div>
@@ -349,22 +377,19 @@ export default function EditRecipe() {
 
         {error && <p style={{ color:'var(--red)', fontSize:'.9rem', textAlign:'center' }}>{error}</p>}
 
-        <button className="btn btn-green" onClick={save} disabled={saving || !title.trim()}>
+        <button className="btn btn-glossy btn-glossy-green" onClick={save} disabled={saving || !title.trim()}>
           {saving ? 'שומר...' : 'שמרו שינויים'}
         </button>
 
-        {/* Danger zone */}
-        <div className="divider" />
-        <div>
-          <div style={{ fontSize:'.78rem', color:'var(--text-muted)', marginBottom:8 }}>אזור מסוכן</div>
-          <button
-            className="btn"
-            style={{ border:'1px solid var(--red)', color:'var(--red)', background:'transparent' }}
-            onClick={() => setConfirmDelete(true)}
-          >
-            <IconTrash size={18} /> מחיקת המתכון
-          </button>
-        </div>
+        {/* Danger zone — delete only, no label */}
+        <div className="divider" style={{ marginBottom: 4 }} />
+        <button
+          className="btn"
+          style={{ border:'1px solid var(--red)', color:'var(--red)', background:'transparent' }}
+          onClick={() => setConfirmDelete(true)}
+        >
+          <IconTrash size={18} /> מחיקת המתכון
+        </button>
       </div>
 
       {/* Double-confirm delete sheet */}
@@ -393,6 +418,8 @@ export default function EditRecipe() {
       )}
 
       <ImageRejectionModal open={imageRejected} onClose={() => setImageRejected(false)} />
+
+      <BottomNav />
     </div>
   )
 }

@@ -1,12 +1,21 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconSearch, IconPlus, IconHeart, IconMessageCircle } from '@tabler/icons-react'
+import { IconSearch, IconHeart, IconMessageCircle } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
 import { CATEGORY_GRADIENTS, countryFlag } from '../lib/mock'
 import BottomNav from '../components/BottomNav'
 import NotificationsBell from '../components/NotificationsBell'
+import AppHeader from '../components/AppHeader'
 
 const FILTERS = ['הכל', 'בשרי', 'טבעוני', 'חלבי', 'ארוחת בוקר', 'קינוחים']
+
+// Canonical author display: first name + last-name initial (no city). e.g. "נפתלי כ."
+function authorName(fullName) {
+  const parts = (fullName || '').trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return 'אנונימי'
+  if (parts.length === 1) return parts[0]
+  return `${parts[0]} ${parts[1][0]}.`
+}
 
 function RecipeCard({ recipe, onClick }) {
   const user      = recipe.users || {}
@@ -22,17 +31,16 @@ function RecipeCard({ recipe, onClick }) {
   return (
     <div className="rcard" style={bgStyle} onClick={onClick}>
       <div className="rcard-overlay">
-        <span className="tag tag-cat rcard-cat">{recipe.category}</span>
         <div className="rcard-title">{recipe.title}</div>
         <div className="rcard-meta">
           <div className="rcard-author">
-            <span>🇮🇱 {countryFlag(user.country)}</span>
-            <span>{user.full_name || 'אנונימי'}</span>
+            <span>{countryFlag(user.country)} 🇮🇱</span>
+            <span>{authorName(user.full_name)}</span>
           </div>
           <div className="rcard-stats">
-            {totalTime > 0    && <span className="stat-row">⏱ {totalTime}ד'</span>}
-            {likesCount > 0   && <span className="stat-row"><IconHeart size={13} /> {likesCount}</span>}
-            {commentsCount > 0 && <span className="stat-row"><IconMessageCircle size={13} /> {commentsCount}</span>}
+            <span className="stat-row"><IconHeart size={13} /> {likesCount}</span>
+            <span className="stat-row"><IconMessageCircle size={13} /> {commentsCount}</span>
+            {totalTime > 0 && <span className="stat-row">⏱ {totalTime}ד'</span>}
           </div>
         </div>
       </div>
@@ -50,9 +58,21 @@ export default function Feed() {
   const [hasMore, setHasMore] = useState(true)
   const [search, setSearch]   = useState('')
   const [filter, setFilter]   = useState('הכל')
+  const [userId, setUserId]     = useState(null)
+  const [userReady, setUserReady] = useState(false)
   const sentinelRef = useRef(null)
 
+  // Who's viewing — so we can hide their own recipes from the community feed.
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUserId(data?.user?.id ?? null)
+      setUserReady(true)
+    })
+  }, [])
+
   // Load one page (range-based). reset=true replaces the list (filter change / first load).
+  // Feed = other people's community recipes (is_public), newest first; the viewer's own
+  // uploads are excluded so they always see fresh content from the community.
   const loadPage = useCallback(async (pageNum, reset) => {
     if (reset) setLoading(true); else setLoadingMore(true)
     const from = pageNum * PAGE_SIZE
@@ -69,6 +89,7 @@ export default function Feed() {
       .range(from, from + PAGE_SIZE - 1)
 
     if (filter !== 'הכל') query = query.eq('category', filter)
+    if (userId) query = query.neq('user_id', userId)
 
     const { data, error } = await query
     if (!error && data) {
@@ -76,10 +97,14 @@ export default function Feed() {
       setHasMore(data.length === PAGE_SIZE)
     }
     setLoading(false); setLoadingMore(false)
-  }, [filter])
+  }, [filter, userId])
 
-  // Reset to the first page whenever the category filter changes.
-  useEffect(() => { setRecipes([]); setHasMore(true); loadPage(0, true) }, [loadPage])
+  // Reset to the first page on filter change — but wait until we know who's viewing,
+  // so the very first load already excludes the viewer's own recipes.
+  useEffect(() => {
+    if (!userReady) return
+    setRecipes([]); setHasMore(true); loadPage(0, true)
+  }, [loadPage, userReady])
 
   // Infinite scroll: load the next page when the sentinel scrolls into view.
   useEffect(() => {
@@ -112,15 +137,12 @@ export default function Feed() {
 
   return (
     <div className="feed-page page-with-nav">
+      <AppHeader right={<NotificationsBell />} />
       <div className="feed-head">
-        <div className="feed-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <img src="/logofullNObackground.png" alt="matkon" style={{ height: 32, objectFit: 'contain' }} />
-          <NotificationsBell />
-        </div>
         <div className="search-bar">
           <IconSearch size={18} />
           <input
-            placeholder="חפשו מתכון, קטגוריה, תגית, מדינה או חבר קהילה..."
+            placeholder="חפשו לפי שם מתכון, מדינה וכו׳"
             value={search}
             onChange={e => setSearch(e.target.value)}
           />
@@ -159,10 +181,6 @@ export default function Feed() {
           <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)', fontSize: '.85rem' }}>טוען עוד...</div>
         )}
       </div>
-
-      <button className="fab" onClick={() => navigate('/add')}>
-        <IconPlus size={24} />
-      </button>
 
       <BottomNav />
     </div>

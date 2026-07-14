@@ -2,30 +2,29 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
-import { IconChevronRight, IconFlame, IconPencil, IconLink, IconCamera, IconPlus, IconX, IconLock, IconWorld, IconBrandWhatsapp, IconBrandX, IconBrandFacebook, IconCopy, IconShieldX, IconHelpCircle, IconEdit, IconHome } from '@tabler/icons-react'
+import { IconChevronRight, IconFlame, IconPencil, IconLink, IconCamera, IconPlus, IconX, IconLock, IconWorld, IconBrandWhatsapp, IconBrandX, IconBrandFacebook, IconCopy, IconCheck, IconShieldX, IconHelpCircle, IconEdit, IconHome } from '@tabler/icons-react'
+import BottomNav from '../components/BottomNav'
+import AppHeader from '../components/AppHeader'
 import { compressImage } from '../lib/compressImage'
 
 const AI_STEPS = [
+  { icon: '📖', label: 'הבנת המתכון' },
   { icon: '🥕', label: 'זיהוי מצרכים' },
-  { icon: '🌍', label: 'תרגום לעברית' },
-  { icon: '🔍', label: 'מיפוי מצרכים' },
   { icon: '📋', label: 'סידור שלבי הכנה' },
   { icon: '🏷️', label: 'תיוג אוטומטי' },
 ]
 
-const fieldLabel = { fontSize:'.78rem', color:'var(--text-muted)', display:'block', marginBottom:4 }
+const fieldLabel = { fontSize:'.78rem', color:'var(--yellow-l)', display:'block', marginBottom:4 }
 
 function StepDots({ current }) {
   return (
-    <div className="step-indicator">
-      {[1,2,3,4].map((s,i) => (
-        <>
-          {i > 0 && <div key={`l${i}`} className={`step-line ${s <= current ? 'done' : ''}`} />}
-          <div key={s} className={`step-dot ${s < current ? 'done' : s === current ? 'current' : 'pending'}`}>
-            {s < current ? '✓' : s}
-          </div>
-        </>
-      ))}
+    <div className="step-progress">
+      <div className="step-progress-track">
+        {[1,2,3,4].map(s => (
+          <div key={s} className={`step-seg ${s < current ? 'done' : s === current ? 'current' : ''}`} />
+        ))}
+      </div>
+      <div className="step-progress-label">שלב {current} מתוך 4</div>
     </div>
   )
 }
@@ -85,8 +84,10 @@ export default function AddRecipe() {
   const [recipe, setRecipe]       = useState(null)
   const [tags, setTags]           = useState([])
   const [newTag, setNewTag]       = useState('')
+  const [allTags, setAllTags]     = useState([])   // existing community tags, for autocomplete
   const [isPublic, setIsPublic]   = useState(false) // private by default — sharing is an explicit opt-in
   const [copied, setCopied]       = useState(false)
+
   const [saving, setSaving]         = useState(false)
   const [saveError, setSaveError]   = useState('')
   const [savedId, setSavedId]       = useState(null)
@@ -206,7 +207,14 @@ export default function AddRecipe() {
           'Authorization': `Bearer ${session?.access_token || ''}`,
         },
         body: JSON.stringify({
-          recipe:       { ...recipe, tags },
+          // Drop empty steps/ingredients the editor may have left behind (a user
+          // can "scaffold" blank rows then not fill them — they shouldn't persist).
+          recipe: {
+            ...recipe,
+            tags,
+            steps:       (recipe.steps || []).filter(s => (s.text || '').trim()),
+            ingredients: (recipe.ingredients || []).filter(i => (i.name || '').trim()),
+          },
           tags,
           isPublic,
           image_url,
@@ -255,12 +263,28 @@ export default function AddRecipe() {
     }
   }
 
-  function addTag() {
-    if (newTag.trim() && !tags.includes(newTag.trim())) {
-      setTags(t => [...t, newTag.trim()])
-      setNewTag('')
-    }
+  // Pull existing community tags (most-used first) so the input can suggest them —
+  // keeps tags consistent instead of "צמחוני"/"צמחונית"/"צמכונית" duplicates.
+  useEffect(() => {
+    supabase.from('recipes').select('tags').eq('is_public', true).limit(500).then(({ data }) => {
+      const counts = {}
+      ;(data || []).forEach(r => (r.tags || []).forEach(t => {
+        const k = (t || '').trim()
+        if (k) counts[k] = (counts[k] || 0) + 1
+      }))
+      setAllTags(Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([t]) => t))
+    })
+  }, [])
+
+  function addTag(value) {
+    const v = (value ?? newTag).trim()
+    if (v && !tags.includes(v)) setTags(t => [...t, v])
+    setNewTag('')
   }
+
+  const tagSuggestions = newTag.trim()
+    ? allTags.filter(t => t.includes(newTag.trim()) && !tags.includes(t)).slice(0, 6)
+    : []
 
   // ── Edit the AI-parsed recipe before saving (brief: the user can always edit) ──
   const setField     = (key, val) => setRecipe(r => ({ ...r, [key]: val }))
@@ -291,7 +315,7 @@ export default function AddRecipe() {
   }
 
   return (
-    <div className="add-page">
+    <div className="add-page page-with-nav">
       {blockInfo && (
         <BlockCard
           info={blockInfo}
@@ -299,13 +323,11 @@ export default function AddRecipe() {
           onHome={() => navigate('/feed')}
         />
       )}
-      <div className="topbar">
-        <button className="btn-icon" onClick={() => step > 1 ? setStep(s => s-1) : navigate(-1)}>
-          <IconChevronRight size={20} />
-        </button>
-        <span className="topbar-title">מתכון חדש</span>
-        <div style={{ width: 40 }} />
-      </div>
+      <AppHeader
+        title="הוספת מתכון חדש"
+        showBack={step !== 4}
+        onBack={() => step > 1 ? setStep(s => s-1) : navigate(-1)}
+      />
 
       <StepDots current={step} />
 
@@ -314,11 +336,11 @@ export default function AddRecipe() {
         <div className="add-body">
           <div className="input-tabs">
             {[
-              { id: 'text',  icon: <IconPencil size={14}/>,  label: 'הקלדה' },
-              { id: 'link',  icon: <IconLink   size={14}/>,  label: 'לינק'  },
-              { id: 'photo', icon: <IconCamera size={14}/>,  label: 'צילום' },
+              { id: 'text',  icon: <IconPencil size={14}/>,  label: 'הקלדה', c: 'blue'   },
+              { id: 'link',  icon: <IconLink   size={14}/>,  label: 'לינק',  c: 'yellow' },
+              { id: 'photo', icon: <IconCamera size={14}/>,  label: 'צילום', c: 'purple' },
             ].map(t => (
-              <button key={t.id} className={`input-tab ${inputType===t.id?'active':''}`} onClick={() => setInputType(t.id)}>
+              <button key={t.id} className={`input-tab tab-${t.c} ${inputType===t.id?'active':''}`} onClick={() => setInputType(t.id)}>
                 {t.icon} {t.label}
               </button>
             ))}
@@ -352,7 +374,7 @@ export default function AddRecipe() {
           {aiError && <p style={{ color:'var(--red)', fontSize:'.9rem', textAlign:'center' }}>{aiError}</p>}
 
           <button
-            className="btn btn-primary"
+            className="btn btn-glossy btn-glossy-blue"
             onClick={runAI}
             disabled={
               parsing ||
@@ -361,7 +383,7 @@ export default function AddRecipe() {
               (inputType === 'photo' && !imageBase64)
             }
           >
-            <IconFlame size={18} /> יאללה, אפשר להתקדם
+            יאללה, אפשר להתקדם
           </button>
         </div>
       )}
@@ -369,19 +391,34 @@ export default function AddRecipe() {
       {/* ── Step 2: AI Processing ── */}
       {step === 2 && (
         <div className="ai-loading">
-          <div className="ai-fire">🔥</div>
+          <div className="ai-pan" aria-hidden="true">
+            <svg viewBox="0 0 130 120" width="112" height="104">
+              <g className="ai-steam" stroke="#cdd8ef" strokeWidth="3.4" fill="none" strokeLinecap="round">
+                <path className="s1" d="M50 52 q-7 -9 0 -18 q7 -9 0 -18" />
+                <path className="s2" d="M65 50 q-7 -9 0 -18 q7 -9 0 -18" />
+                <path className="s3" d="M80 52 q-7 -9 0 -18 q7 -9 0 -18" />
+              </g>
+              <ellipse className="ai-glow" cx="63" cy="92" rx="34" ry="7" />
+              <g stroke="#e7edf9" strokeWidth="4" fill="none" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M26 66 q0 20 16 22 l42 0 q16 -2 16 -22" />
+                <path d="M26 66 q37 14 74 0" />
+                <line x1="100" y1="64" x2="124" y2="57" />
+              </g>
+            </svg>
+          </div>
           <div className="ai-title">על האש</div>
           <div className="ai-steps">
-            {AI_STEPS.map((s, i) => (
-              <div key={i} className={`ai-step-row ${i <= aiStep ? 'done' : ''}`}>
-                <span className="ai-step-icon">{s.icon}</span>
-                <span className="ai-step-text">{s.label}</span>
-                {i === aiStep && (
-                  <span className="ai-dots"><span>.</span><span>.</span><span>.</span></span>
-                )}
-                {i < aiStep && <span style={{ color:'var(--green)', fontSize:'.85rem' }}>✓</span>}
-              </div>
-            ))}
+            {AI_STEPS.map((s, i) => {
+              const state = i < aiStep ? 'done' : i === aiStep ? 'active' : 'pending'
+              return (
+                <div key={i} className={`ai-step-row ${state}`}>
+                  <span className="ai-step-icon">{s.icon}</span>
+                  <span className="ai-step-text">{s.label}</span>
+                  {state === 'active' && <span className="ai-spinner" aria-label="מעבד" />}
+                  {state === 'done'   && <span className="ai-step-done"><IconCheck size={14} stroke={3} /></span>}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
@@ -390,18 +427,23 @@ export default function AddRecipe() {
       {step === 3 && (
         <div className="add-body">
 
+          <p className="add-hint">
+            אם תזינו זמן בשלב הכנה, ניצור טיימר אוטומטי לבישול.<br />
+            הימנעו מלחזור על אותו זמן בשלבים עוקבים.
+          </p>
+
           {/* Recipe — editable. The brief requires the user can always edit the AI
               result before saving (fix a misread, change wording, etc.). */}
           {recipe && (
             <div style={{ background:'var(--bg-elevated)', borderRadius:16, padding:16, display:'flex', flexDirection:'column', gap:12 }}>
               <div>
                 <label style={fieldLabel}>כותרת</label>
-                <input className="input" value={recipe.title || ''} onChange={e => setField('title', e.target.value)} placeholder="שם המתכון" />
+                <input className="input" maxLength={200} value={recipe.title || ''} onChange={e => setField('title', e.target.value)} placeholder="שם המתכון" />
               </div>
 
               <div>
                 <label style={fieldLabel}>תיאור</label>
-                <textarea className="input input-textarea" style={{ minHeight:80 }} value={recipe.description || ''} onChange={e => setField('description', e.target.value)} placeholder="תיאור קצר" />
+                <textarea className="input input-textarea" maxLength={2000} style={{ minHeight:80 }} value={recipe.description || ''} onChange={e => setField('description', e.target.value)} placeholder="תיאור קצר" />
               </div>
 
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
@@ -436,7 +478,7 @@ export default function AddRecipe() {
                 {(recipe.steps || []).map((st, idx) => (
                   <div key={idx} style={{ display:'flex', gap:6, alignItems:'flex-start', marginBottom:6 }}>
                     <span style={{ color:'var(--blue-light)', fontSize:'.85rem', marginTop:11, flexShrink:0, width:16 }}>{idx + 1}.</span>
-                    <textarea className="input" style={{ flex:1, minHeight:44, padding:'8px 10px', resize:'vertical' }} placeholder={`שלב ${idx + 1}`} value={st.text || ''} onChange={e => setStepText(idx, e.target.value)} />
+                    <textarea className="input" style={{ flex:1, minHeight:44, padding:'8px 10px', resize:'none' }} placeholder={`שלב ${idx + 1}`} value={st.text || ''} onChange={e => setStepText(idx, e.target.value)} />
                     <button className="btn-icon" style={{ color:'var(--red)', flexShrink:0 }} onClick={() => delStep(idx)} aria-label="הסר שלב"><IconX size={16} /></button>
                   </div>
                 ))}
@@ -457,8 +499,15 @@ export default function AddRecipe() {
             </div>
             <div className="tag-add-input">
               <input className="input" placeholder="הוסיפו תגית..." value={newTag} onChange={e=>setNewTag(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addTag()} style={{height:40,padding:'8px 12px'}} />
-              <button className="btn btn-ghost btn-sm" onClick={addTag} style={{width:'auto',padding:'8px 14px'}}><IconPlus size={16}/></button>
+              <button className="btn btn-ghost btn-sm" onClick={() => addTag()} style={{width:'auto',padding:'8px 14px'}}><IconPlus size={16}/></button>
             </div>
+            {tagSuggestions.length > 0 && (
+              <div className="tag-suggestions">
+                {tagSuggestions.map(t => (
+                  <button key={t} type="button" className="tag-suggestion" onClick={() => addTag(t)}>{t}</button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="divider" />
@@ -514,14 +563,14 @@ export default function AddRecipe() {
             <div className="section-title">מי רואה את המתכון</div>
             <div className="visibility-opts">
               <div className={`vis-opt ${isPublic ? 'selected' : ''}`} onClick={() => setIsPublic(true)}>
-                <IconWorld size={22} color={isPublic ? 'var(--blue-light)' : 'var(--text-muted)'} />
+                <IconWorld size={22} color="var(--green)" />
                 <div className="vis-opt-text">
                   <div className="vis-opt-title">שיתוף עם הקהילה</div>
                   <div className="vis-opt-desc">כולם יוכלו לראות ולבשל את המתכון שלכם</div>
                 </div>
               </div>
               <div className={`vis-opt ${!isPublic ? 'selected' : ''}`} onClick={() => setIsPublic(false)}>
-                <IconLock size={22} color={!isPublic ? 'var(--blue-light)' : 'var(--text-muted)'} />
+                <IconLock size={22} color="#a78bff" />
                 <div className="vis-opt-text">
                   <div className="vis-opt-title">שמירה אישית</div>
                   <div className="vis-opt-desc">רק אתם תראו את המתכון</div>
@@ -538,42 +587,46 @@ export default function AddRecipe() {
         </div>
       )}
 
-      {/* ── Step 4: Share ── */}
+      {/* ── Step 4: Success + Share ── */}
       {step === 4 && (
-        <div className="add-body" style={{ alignItems: 'center', textAlign: 'center' }}>
+        <div className="add-body add-success">
+          {/* Success marker at the top (under the progress bar) — the celebratory
+              "done" moment gets top billing before the image. */}
+          <div className="success-badge">
+            <span className="success-check"><IconCheck size={18} stroke={3} /></span>
+            המתכון נשמר
+          </div>
+
           {savedImage && (
             <div
-              style={{
-                width: '100%', aspectRatio: '16/10', borderRadius: 16, overflow: 'hidden',
-                backgroundImage: `url(${savedImage})`, backgroundSize: 'cover', backgroundPosition: 'center',
-                backgroundColor: 'var(--bg-mid)', marginBottom: 6,
-              }}
+              className="success-img"
+              style={{ backgroundImage: `url(${savedImage})` }}
               role="img"
               aria-label={recipe?.title || 'תמונת המתכון'}
             />
           )}
-          {recipe?.title && (
-            <div style={{ color: 'var(--green)', fontWeight: 800, fontSize: '1.25rem', margin: '2px 0 6px' }}>
-              {recipe.title}
-            </div>
-          )}
-          <h2 style={{ margin: 0 }}>המתכון נשמר!</h2>
-          <p style={{ color: 'var(--text-2)', fontSize: '.9rem' }}>שתפו עם החברים שלכם</p>
 
-          <div className="share-btns" style={{ width: '100%', marginTop: 8 }}>
-            <button className="share-btn" onClick={() => shareTo('whatsapp')}><IconBrandWhatsapp size={20} color="#25d366" /> וואטסאפ</button>
-            <button className="share-btn" onClick={() => shareTo('facebook')}><IconBrandFacebook size={20} color="#1877f2" /> פייסבוק</button>
-            <button className="share-btn" onClick={() => shareTo('x')}><IconBrandX size={20} /> X</button>
-            <button className="share-btn" onClick={copyLink}>
-              <IconCopy size={20} /> {copied ? 'הועתק!' : 'העתקת לינק'}
-            </button>
+          {recipe?.title && <div className="success-title">{recipe.title}</div>}
+
+          <div className="success-share">
+            <p className="success-share-label">שתפו עם החברים שלכם</p>
+            <div className="share-icons">
+              <button className="share-icon share-wa" onClick={() => shareTo('whatsapp')} aria-label="שיתוף בוואטסאפ"><IconBrandWhatsapp size={26} /></button>
+              <button className="share-icon share-fb" onClick={() => shareTo('facebook')} aria-label="שיתוף בפייסבוק"><IconBrandFacebook size={26} /></button>
+              <button className="share-icon share-tw" onClick={() => shareTo('x')} aria-label="שיתוף ב-X"><IconBrandX size={26} /></button>
+              <button className={`share-icon share-cp ${copied ? 'copied' : ''}`} onClick={copyLink} aria-label="העתקת לינק">
+                {copied ? <IconCheck size={26} /> : <IconCopy size={26} />}
+              </button>
+            </div>
           </div>
 
-          <button className="btn btn-ghost" style={{ marginTop: 12, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} onClick={() => navigate('/feed')}>
-            <IconHome size={16} /> בחזרה לעמוד הראשי
+          <button className="btn btn-glossy btn-glossy-purple" style={{ marginTop: 24 }} onClick={() => navigate('/feed')}>
+            בחזרה לעמוד הראשי
           </button>
         </div>
       )}
+
+      <BottomNav />
     </div>
   )
 }
