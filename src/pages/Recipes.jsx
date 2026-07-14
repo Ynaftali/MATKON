@@ -1,11 +1,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconHeart, IconMessageCircle } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
-import { CATEGORY_GRADIENTS, countryFlag } from '../lib/mock'
 import { useAuth } from '../lib/AuthContext'
 import BottomNav from '../components/BottomNav'
 import AppHeader from '../components/AppHeader'
+import RecipeCard from '../components/RecipeCard'
 
 const TABS = [
   { id: 'mine',      label: 'המתכונים שלי' },
@@ -26,44 +25,6 @@ const COUNTRY_FILTERS = [
   { code: 'אוסטרליה',  label: '🇦🇺 אוסטרליה' },
   { code: 'קנדה',      label: '🇨🇦 קנדה' },
 ]
-
-// Canonical author display: first name + last initial (shared with Feed).
-function authorName(fullName) {
-  const parts = (fullName || '').trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return 'אנונימי'
-  if (parts.length === 1) return parts[0]
-  return `${parts[0]} ${parts[1][0]}.`
-}
-
-function RecipeCard({ recipe, onClick }) {
-  const user      = recipe.users || {}
-  const totalTime = (recipe.prep_time || 0) + (recipe.cook_time || 0)
-  const gradient  = CATEGORY_GRADIENTS[recipe.category] || 'linear-gradient(160deg, #1e3a6e, #3d6fa8)'
-  const bgStyle   = recipe.image_url
-    ? { backgroundImage: `url(${recipe.image_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
-    : { background: gradient }
-  const likesCount    = recipe.likes?.[0]?.count    ?? recipe.likes_count    ?? 0
-  const commentsCount = recipe.recipe_comments?.[0]?.count ?? recipe.comments_count ?? 0
-
-  return (
-    <div className="rcard" style={bgStyle} onClick={onClick}>
-      <div className="rcard-overlay">
-        <div className="rcard-title">{recipe.title}</div>
-        <div className="rcard-meta">
-          <div className="rcard-author">
-            <span>{countryFlag(user.country)} 🇮🇱</span>
-            <span>{authorName(user.full_name)}</span>
-          </div>
-          <div className="rcard-stats">
-            <span className="stat-row"><IconHeart size={13}/> {likesCount}</span>
-            <span className="stat-row"><IconMessageCircle size={13}/> {commentsCount}</span>
-            {totalTime > 0 && <span className="stat-row">⏱ {totalTime}ד'</span>}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function EmptyState({ icon, text, sub, subColor, btnText, onBtn }) {
   return (
