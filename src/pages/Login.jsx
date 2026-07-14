@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconChevronRight, IconEye, IconEyeOff } from '@tabler/icons-react'
+import { IconEye, IconEyeOff } from '@tabler/icons-react'
 import { supabase, canUsePasskeys, isPasskeyCancel } from '../lib/supabase'
 import { armConditionalPasskey } from '../lib/passkeys'
 import SsoButtons from '../components/SsoButtons'
 import PasskeyOfferModal from '../components/PasskeyOfferModal'
+import AppHeader from '../components/AppHeader'
 
 const PASSKEY_OFFER_SEEN = 'matkon_passkey_offer_seen'
 
@@ -43,7 +44,18 @@ export default function Login() {
       password: form.password,
     })
     setLoading(false)
-    if (error) { setError('אימייל או סיסמה שגויים'); return }
+    if (error) {
+      // Distinguish "email not yet confirmed" from bad credentials — otherwise a
+      // user with the right password is wrongly told it's wrong. Supabase returns
+      // code 'email_not_confirmed' when the account exists but wasn't verified.
+      if (error.code === 'email_not_confirmed' || /confirm/i.test(error.message)) {
+        localStorage.setItem('pending_email', form.email)
+        setError('צריך לאשר את המייל לפני הכניסה. שלחנו לכם לינק — בדקו את תיבת הדואר.')
+      } else {
+        setError('Email או סיסמה שגויים')
+      }
+      return
+    }
     // Brief §182: first-time-on-this-device users get the optional bio prompt —
     // but ONLY when the account is fresh. An existing account that happens to
     // have no bio shouldn't be nagged after we ship this feature.
@@ -86,22 +98,13 @@ export default function Login() {
 
   return (
     <div className="auth-page">
-      <button className="btn-icon" style={{ marginBottom: 8 }} onClick={() => navigate(-1)}>
-        <IconChevronRight size={20} />
-      </button>
-
-      <div style={{ textAlign: 'center', marginBottom: 8 }}>
-        <img src="/logofullNObackground.png" alt="matkon" style={{ width: '55%', maxWidth: 200 }} />
-      </div>
-
-      <div className="auth-header">
-        <h1>שלום שוב 👋</h1>
+      <AppHeader title="שמחים שחזרתם">
         <p>כניסה לחשבון הקיים שלכם</p>
-      </div>
+      </AppHeader>
 
       <form className="auth-form" onSubmit={submit}>
         <div className="auth-field">
-          <label className="auth-label">אימייל</label>
+          <label className="auth-label">Email</label>
           {/* "webauthn" token lets iOS/Android surface passkeys in the autofill bar */}
           <input className="input" type="email" placeholder="your@email.com" value={form.email} onChange={set('email')} required autoComplete="username webauthn" />
         </div>
@@ -114,11 +117,11 @@ export default function Login() {
               {showPw ? <IconEyeOff size={18} /> : <IconEye size={18} />}
             </button>
           </div>
-          <div className="auth-forgot"><a onClick={() => {}}>שכחתם סיסמה?</a></div>
+          <div className="auth-forgot" style={{ marginTop: 6 }}><a onClick={() => {}}>שכחתם סיסמה?</a></div>
         </div>
 
         {error && <p style={{ color:'var(--red)', fontSize:'.9rem', textAlign:'center' }}>{error}</p>}
-        <button className="btn btn-primary" type="submit" disabled={loading}>
+        <button className="btn btn-glossy btn-glossy-blue" type="submit" disabled={loading}>
           {loading ? 'מתחבר...' : 'כניסה לחשבון'}
         </button>
 

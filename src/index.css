@@ -911,6 +911,10 @@ p  { line-height: 1.6; }
 /* Shared app header wrapper — padding on the wrapper keeps `.auth-top` exactly
    the logo's height so `.auth-back { top:68% }` stays vertically centered. */
 .app-head { padding: 16px 16px 0; }
+/* Inside .auth-page (24px padding) pull the header back out so it sits at the
+   app-wide 16px gutter while the form content keeps its 24px padding.
+   (.legal-page zeroes the page padding, so it's excluded.) */
+.auth-page:not(.legal-page) > .app-head { margin: -24px -24px 0; }
 .app-head-right { position: absolute; left: 0; top: 50%; transform: translateY(-50%); }
 
 .profile-header {

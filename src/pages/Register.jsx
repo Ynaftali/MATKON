@@ -1,32 +1,27 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconChevronRight, IconEye, IconEyeOff } from '@tabler/icons-react'
 import { COUNTRIES } from '../lib/mock'
 import { supabase } from '../lib/supabase'
+import { passwordValid } from '../lib/passwordRules'
 import SsoButtons from '../components/SsoButtons'
-
-const RULES = [
-  { label: 'לפחות 8 תווים',      test: pw => pw.length >= 8 },
-  { label: 'אות גדולה (A-Z)',     test: pw => /[A-Z]/.test(pw) },
-  { label: 'מספר (0-9)',           test: pw => /[0-9]/.test(pw) },
-  { label: 'תו מיוחד (!@#$...)',  test: pw => /[^A-Za-z0-9]/.test(pw) },
-]
+import CountrySelect from '../components/CountrySelect'
+import NameFields from '../components/NameFields'
+import PasswordInput from '../components/PasswordInput'
+import AppHeader from '../components/AppHeader'
 
 export default function Register() {
   const navigate = useNavigate()
-  const [form, setForm]   = useState({ firstName: '', lastName: '', email: '', emailConfirm: '', password: '', confirm: '', country: '' })
+  const [form, setForm]   = useState({ firstName: '', lastName: '', email: '', emailConfirm: '', password: '', country: '' })
   const [tosAgreed, setTosAgreed] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [showPw, setShowPw]   = useState(false)
-  const [showPw2, setShowPw2] = useState(false)
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
-  const rulesPassed    = RULES.map(r => r.test(form.password))
-  const allRulesPass   = rulesPassed.every(Boolean)
-  const passwordsMatch = form.confirm ? form.password === form.confirm : null
+  const allRulesPass   = passwordValid(form.password)
   const emailsMatch    = form.emailConfirm ? form.email.trim().toLowerCase() === form.emailConfirm.trim().toLowerCase() : null
-  const canSubmit      = allRulesPass && passwordsMatch && emailsMatch && tosAgreed && !loading
+  const countryValid   = COUNTRIES.includes(form.country)
+  const namesFilled    = form.firstName.trim() && form.lastName.trim()
+  const canSubmit      = namesFilled && allRulesPass && emailsMatch && countryValid && tosAgreed && !loading
 
   const submit = async e => {
     e.preventDefault()
@@ -70,93 +65,44 @@ export default function Register() {
 
   return (
     <div className="auth-page">
-      <div className="topbar" style={{ position: 'static', padding: '0 0 16px' }}>
-        <button className="btn-icon" onClick={() => navigate(-1)}>
-          <IconChevronRight size={20} />
-        </button>
-      </div>
-
-      <div className="auth-header">
-        <h1>הצטרפות לקהילה</h1>
-        <p>ישראלים מבשלים בכל העולם — הצטרפו עכשיו</p>
-      </div>
+      <AppHeader title="הצטרפות לקהילה" />
 
       <form className="auth-form" onSubmit={submit}>
-        <div className="auth-row">
-          <div className="auth-field">
-            <label className="auth-label">שם פרטי</label>
-            <input className="input" placeholder="ישראל" value={form.firstName} onChange={set('firstName')} required autoComplete="given-name" />
-          </div>
-          <div className="auth-field">
-            <label className="auth-label">שם משפחה</label>
-            <input className="input" placeholder="ישראלי" value={form.lastName} onChange={set('lastName')} required autoComplete="family-name" />
-          </div>
-        </div>
+        <NameFields
+          firstName={form.firstName}
+          lastName={form.lastName}
+          onFirst={v => setForm(f => ({ ...f, firstName: v }))}
+          onLast={v => setForm(f => ({ ...f, lastName: v }))}
+        />
 
         <div className="auth-field">
-          <label className="auth-label">אימייל</label>
+          <label className="auth-label">Email</label>
           <input className="input" type="email" placeholder="your@email.com" value={form.email} onChange={set('email')} required autoComplete="email" />
         </div>
 
         <div className="auth-field">
-          <label className="auth-label">וידוא אימייל</label>
-          <input className="input" type="email" placeholder="חזרו על האימייל" value={form.emailConfirm} onChange={set('emailConfirm')} required autoComplete="off" onPaste={e => e.preventDefault()} />
+          <label className="auth-label">וידוא Email</label>
+          <input className="input" type="email" placeholder="חזרו על ה-Email" value={form.emailConfirm} onChange={set('emailConfirm')} required autoComplete="off" onPaste={e => e.preventDefault()} />
           {emailsMatch !== null && (
             <div className={`pw-match ${emailsMatch ? 'ok' : 'err'}`}>
-              {emailsMatch ? '✓ האימיילים תואמים' : '✗ האימיילים לא תואמים'}
+              {emailsMatch ? '✓ כתובות ה-Email תואמות' : '✗ כתובות ה-Email לא תואמות'}
             </div>
           )}
         </div>
 
         <div className="auth-field">
           <label className="auth-label">סיסמה</label>
-          <div className="input-wrap">
-            <input className="input" type={showPw ? 'text' : 'password'} placeholder="צרו סיסמה חזקה" value={form.password} onChange={set('password')} required autoComplete="new-password" />
-            <button type="button" className="input-eye" onClick={() => setShowPw(s => !s)} aria-label={showPw ? 'הסתירו סיסמה' : 'הציגו סיסמה'}>
-              {showPw ? <IconEyeOff size={18} /> : <IconEye size={18} />}
-            </button>
-          </div>
-          {form.password && (
-            <div className="pw-rules">
-              {RULES.map((r, i) => (
-                <div key={i} className={`pw-rule ${rulesPassed[i] ? 'ok' : ''}`}>
-                  <span className="pw-rule-icon">{rulesPassed[i] ? '✓' : '○'}</span>
-                  {r.label}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="auth-field">
-          <label className="auth-label">אימות סיסמה</label>
-          <div className="input-wrap">
-            <input className="input" type={showPw2 ? 'text' : 'password'} placeholder="חזרו על הסיסמה" value={form.confirm} onChange={set('confirm')} required autoComplete="new-password" />
-            <button type="button" className="input-eye" onClick={() => setShowPw2(s => !s)} aria-label={showPw2 ? 'הסתירו סיסמה' : 'הציגו סיסמה'}>
-              {showPw2 ? <IconEyeOff size={18} /> : <IconEye size={18} />}
-            </button>
-          </div>
-          {passwordsMatch !== null && (
-            <div className={`pw-match ${passwordsMatch ? 'ok' : 'err'}`}>
-              {passwordsMatch ? '✓ הסיסמאות תואמות' : '✗ הסיסמאות לא תואמות'}
-            </div>
-          )}
+          <PasswordInput
+            value={form.password}
+            onChange={v => setForm(f => ({ ...f, password: v }))}
+            placeholder="צרו סיסמה חזקה"
+            showRules
+          />
         </div>
 
         <div className="auth-field">
           <label className="auth-label">מדינת מגורים</label>
-          <input
-            className="input"
-            list="countries-list"
-            placeholder="חפשו מדינה..."
-            value={form.country}
-            onChange={set('country')}
-            required
-            autoComplete="off"
-          />
-          <datalist id="countries-list">
-            {COUNTRIES.map(c => <option key={c} value={c} />)}
-          </datalist>
+          <CountrySelect value={form.country} onChange={v => setForm(f => ({ ...f, country: v }))} />
         </div>
 
         {error && <p style={{ color:'var(--red)', fontSize:'.9rem', textAlign:'center' }}>{error}</p>}
@@ -173,8 +119,8 @@ export default function Register() {
           </span>
         </label>
 
-        <button className="btn btn-primary" type="submit" disabled={!canSubmit} style={{ backgroundColor: '#3d6fa8', borderColor: '#3d6fa8' }}>
-          {loading ? 'יוצר חשבון...' : 'מוכנים להיכנס למטבח'}
+        <button className="btn btn-glossy btn-glossy-blue" type="submit" disabled={!canSubmit}>
+          {loading ? 'יוצר חשבון...' : 'הרשמה למטבח'}
         </button>
 
         <div className="auth-divider">או הירשמו עם</div>

@@ -46,7 +46,9 @@
 
 **🚩 החלטת גיאומטריית הדר נעולה (15.7):** גוטר אחיד **16px** בכל האפליקציה (חץ 16px מהקצה, לוגו 16px מלמעלה). קדם לכך היו 3 גיאומטריות (0/16/24). המשתמש בחר 16px אחרי השוואה חזותית של שלושת המצבים זה-לצד-זה על מסך Recipes.
 
-**✅ C1 — AppHeader אומץ (15.7):** Feed, Recipes, Shopping, AddRecipe, EditRecipe. `AppHeader` הורחב ב-2 props: `showBack` (מסתיר חץ, לשלב 4 של AddRecipe) + `compact` (`.auth-header.compact` margin-bottom 12px למסכי-רשימה מול 32px למסכי-טופס). נוקו: `paddingTop:20` inline מ-Recipes/Shopping, `padding-top:20px` מ-`.add-page`, `.feed-head` ל-`0 16px`. הפעמון ב-Feed עבר ל-prop `right`. הוסרו imports יתומים של `IconArrowRight`. אומת חי ב-375px: back 16px / logo 16px בכל 5 העמודים; Feed פיקסל-זהה (כבר היה 16px). build נקי. **הבא: C2 (AppHeader variant ל-auth pages) — ממתין לאישור.**
+**✅ C1 — AppHeader אומץ (15.7):** Feed, Recipes, Shopping, AddRecipe, EditRecipe. `AppHeader` הורחב ב-2 props: `showBack` (מסתיר חץ, לשלב 4 של AddRecipe) + `compact` (`.auth-header.compact` margin-bottom 12px למסכי-רשימה מול 32px למסכי-טופס). נוקו: `paddingTop:20` inline מ-Recipes/Shopping, `padding-top:20px` מ-`.add-page`, `.feed-head` ל-`0 16px`. הפעמון ב-Feed עבר ל-prop `right`. הוסרו imports יתומים של `IconArrowRight`. אומת חי ב-375px: back 16px / logo 16px בכל 5 העמודים; Feed פיקסל-זהה (כבר היה 16px). build נקי.
+
+**✅ C2 — AppHeader במסכי auth (15.7):** Login, Register, VerifyEmail, SSOCountry, CompleteProfile. `AppHeader` קיבל `children` (תת-כותרת משתנה בתוך `.auth-header`); CSS: `.auth-page:not(.legal-page) > .app-head { margin: -24px -24px 0 }` — ההדר יושב ב-16px בעוד תוכן הטופס נשאר בריפוד 24px (`.legal-page` מוחרג כי הריפוד שלו 0). אומת חי בכל 5 המסכים (back 16 / logo 16, טופס x=24) + `/terms` לא נפגע. הוסרו כל שאריות `IconArrowRight` מחוץ ל-AppHeader. **הבא: C3 (RecipeCard ב-Feed+Recipes) — ממתין לאישור.**
 
 ### Phase 2 — ניקוי לפני merge
 - **להסיר** `TEMP-PREVIEW` bypass ב-`RequireAuth` (`src/App.jsx`, `import.meta.env.DEV && ?preview=1`).

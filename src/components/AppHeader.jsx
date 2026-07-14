@@ -8,7 +8,9 @@ import { useNavigate } from 'react-router-dom'
 // logo's height (which is what `.auth-back { top: 68% }` is tuned against).
 // `showBack` hides the arrow (AddRecipe success step); `compact` tightens the
 // gap below the title (list pages) vs the roomier default (form pages).
-export default function AppHeader({ title, onBack, right, showBack = true, compact = false }) {
+// `children` renders inside `.auth-header` below the title — the varying
+// subtitle line on auth pages.
+export default function AppHeader({ title, onBack, right, showBack = true, compact = false, children }) {
   const navigate = useNavigate()
   return (
     <div className="app-head">
@@ -21,7 +23,12 @@ export default function AppHeader({ title, onBack, right, showBack = true, compa
         <img src="/logofullNObackground.png" alt="MATKON" className="auth-logo" />
         {right && <div className="app-head-right">{right}</div>}
       </div>
-      {title && <div className={`auth-header${compact ? ' compact' : ''}`}><h1>{title}</h1></div>}
+      {(title || children) && (
+        <div className={`auth-header${compact ? ' compact' : ''}`}>
+          {title && <h1>{title}</h1>}
+          {children}
+        </div>
+      )}
     </div>
   )
 }
