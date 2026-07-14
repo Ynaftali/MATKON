@@ -34,9 +34,11 @@ export default function RecipeCard({ recipe, onClick, showAuthor = true, visibil
           ) : showAuthor ? (
             <div className="rcard-author">
               {/* Canonical flag order (locked 14.7): Israel flag on the RIGHT,
-                  user-country flag to its left. LTR flex → last child = right. */}
+                  user-country flag to its left. LTR flex → last child = right.
+                  Israeli users get 🇮🇱🇮🇱 on purpose — every card shows the same
+                  two-flag format (user decision 15.7). */}
               <span dir="ltr" style={{ display: 'inline-flex', gap: 3 }}>
-                {countryFlag(user.country) && countryFlag(user.country) !== '🇮🇱' && <span>{countryFlag(user.country)}</span>}
+                {countryFlag(user.country) && <span>{countryFlag(user.country)}</span>}
                 <span>🇮🇱</span>
               </span>
               <span>{authorName(user.full_name)}</span>
