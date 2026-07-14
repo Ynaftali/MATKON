@@ -5,6 +5,7 @@ import { useAuth } from '../lib/AuthContext'
 import { IconChevronRight, IconFlame, IconPencil, IconLink, IconCamera, IconPlus, IconX, IconLock, IconWorld, IconBrandWhatsapp, IconBrandX, IconBrandFacebook, IconCopy, IconCheck, IconShieldX, IconHelpCircle, IconEdit, IconHome } from '@tabler/icons-react'
 import BottomNav from '../components/BottomNav'
 import AppHeader from '../components/AppHeader'
+import IngredientEditor from '../components/IngredientEditor'
 import { compressImage } from '../lib/compressImage'
 
 const AI_STEPS = [
@@ -288,9 +289,6 @@ export default function AddRecipe() {
 
   // ── Edit the AI-parsed recipe before saving (brief: the user can always edit) ──
   const setField     = (key, val) => setRecipe(r => ({ ...r, [key]: val }))
-  const setIng       = (idx, key, val) => setRecipe(r => ({ ...r, ingredients: (r.ingredients || []).map((it, i) => i === idx ? { ...it, [key]: val } : it) }))
-  const addIng       = () => setRecipe(r => ({ ...r, ingredients: [...(r.ingredients || []), { name: '', amount: '', unit: '' }] }))
-  const delIng       = idx => setRecipe(r => ({ ...r, ingredients: (r.ingredients || []).filter((_, i) => i !== idx) }))
   const setStepText  = (idx, val) => setRecipe(r => ({ ...r, steps: (r.steps || []).map((it, i) => i === idx ? { ...it, text: val } : it) }))
   const addStep      = () => setRecipe(r => ({ ...r, steps: [...(r.steps || []), { text: '', duration_seconds: null }] }))
   const delStep      = idx => setRecipe(r => ({ ...r, steps: (r.steps || []).filter((_, i) => i !== idx) }))
@@ -462,15 +460,10 @@ export default function AddRecipe() {
 
               <div>
                 <div className="section-title" style={{ fontSize:'.85rem', marginBottom:8 }}>מצרכים</div>
-                {(recipe.ingredients || []).map((ing, idx) => (
-                  <div key={idx} style={{ display:'flex', gap:6, alignItems:'center', marginBottom:6 }}>
-                    <input className="input" style={{ flex:1, height:40, padding:'8px 10px' }} placeholder="שם" value={ing.name || ''} onChange={e => setIng(idx, 'name', e.target.value)} />
-                    <input className="input" style={{ width:56, height:40, padding:'8px 6px', textAlign:'center' }} placeholder="כמות" value={ing.amount || ''} onChange={e => setIng(idx, 'amount', e.target.value)} />
-                    <input className="input" style={{ width:64, height:40, padding:'8px 6px', textAlign:'center' }} placeholder="יח׳" value={ing.unit || ''} onChange={e => setIng(idx, 'unit', e.target.value)} />
-                    <button className="btn-icon" style={{ color:'var(--red)', flexShrink:0 }} onClick={() => delIng(idx)} aria-label="הסר מצרך"><IconX size={16} /></button>
-                  </div>
-                ))}
-                <button className="btn btn-ghost btn-sm" style={{ width:'auto', padding:'8px 12px', marginTop:4 }} onClick={addIng}><IconPlus size={16} /> הוסף מצרך</button>
+                <IngredientEditor
+                  ingredients={recipe.ingredients}
+                  onChange={ings => setRecipe(r => ({ ...r, ingredients: ings }))}
+                />
               </div>
 
               <div>

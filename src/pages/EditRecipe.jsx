@@ -10,6 +10,7 @@ import { compressImage } from '../lib/compressImage'
 import ImageRejectionModal from '../components/ImageRejectionModal'
 import BottomNav from '../components/BottomNav'
 import AppHeader from '../components/AppHeader'
+import IngredientEditor from '../components/IngredientEditor'
 
 // Normalize stored ingredients (mock {name_he,quantity} or AI {name,amount}) to one editable shape.
 const normIngredients = arr => (Array.isArray(arr) ? arr : []).map(i => ({
@@ -88,11 +89,6 @@ export default function EditRecipe() {
     setImageUrl(data.image_url || null)
     setLoading(false)
   }
-
-  // ── ingredient helpers ──
-  const setIng = (idx, key, val) => setIngredients(arr => arr.map((it, i) => i === idx ? { ...it, [key]: val } : it))
-  const addIng = () => setIngredients(arr => [...arr, { name: '', amount: '', unit: '' }])
-  const delIng = idx => setIngredients(arr => arr.filter((_, i) => i !== idx))
 
   // ── step helpers ──
   const setStepText = (idx, val) => setSteps(arr => arr.map((it, i) => i === idx ? { ...it, text: val } : it))
@@ -297,15 +293,7 @@ export default function EditRecipe() {
         {/* Ingredients */}
         <div>
           <div className="section-title">מצרכים</div>
-          {ingredients.map((ing, idx) => (
-            <div key={idx} style={{ display:'flex', gap:6, alignItems:'center', marginBottom:6 }}>
-              <input className="input" style={{ flex:1, height:40, padding:'8px 10px' }} placeholder="שם" value={ing.name} onChange={e => setIng(idx, 'name', e.target.value)} />
-              <input className="input" style={{ width:56, height:40, padding:'8px 6px', textAlign:'center' }} placeholder="כמות" value={ing.amount} onChange={e => setIng(idx, 'amount', e.target.value)} />
-              <input className="input" style={{ width:64, height:40, padding:'8px 6px', textAlign:'center' }} placeholder="יח׳" value={ing.unit} onChange={e => setIng(idx, 'unit', e.target.value)} />
-              <button className="btn-icon" style={{ color:'var(--red)', flexShrink:0 }} onClick={() => delIng(idx)} aria-label="הסר מצרך"><IconX size={16} /></button>
-            </div>
-          ))}
-          <button className="btn btn-ghost btn-sm" style={{ width:'auto', padding:'8px 12px', marginTop:4 }} onClick={addIng}><IconPlus size={16} /> הוסף מצרך</button>
+          <IngredientEditor ingredients={ingredients} onChange={setIngredients} />
         </div>
 
         <div className="divider" />
