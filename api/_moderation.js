@@ -56,6 +56,30 @@ const MODERATION_SYSTEM = `אתה מנגנון סינון תוכן (moderation) 
 - reason: משפט קצר אחד בעברית שמסביר את הסיבה (יוצג למשתמש).
 - החזר JSON בלבד, ללא טקסט נוסף.`
 
+// Abuse-only moderation for free-text profile fields (e.g. the bio). Unlike the
+// recipe moderator above, this NEVER blocks for "not a recipe" — a bio is not a
+// recipe, and junk is not a violation here. Only genuine abuse is caught.
+const MODERATION_SYSTEM_TEXT = `אתה מנגנון סינון תוכן (moderation) של אפליקציית מתכונים קהילתית בשם matkon.
+תפקידך: לבדוק טקסט חופשי שמשתמש כתב (למשל תיאור אישי בפרופיל, או תגובה על מתכון), ולקבוע אם הוא תואם את כללי הקהילה.
+
+החזר JSON תקין בלבד בפורמט:
+{ "allowed": true/false, "kind": "ok"|"abuse", "category": "...", "quote": "...", "reason": "..." }
+
+חסום עם kind="abuse" אם קיים אחד מאלה:
+- שפה פוגענית, גסה, מבזה, גזענית, אנטישמית או מסיתה (category: "hate")
+- אלימות, איומים, תוכן מסוכן, הוראות לפגיעה (category: "violence")
+- תוכן מיני, עירום, או תוכן הנוגע בקטינים (category: "sexual")
+- דגל פלסטין, סמלים פלסטיניים, או תוכן פוליטי מסית כנגד ישראל (category: "flag")
+
+אחרת — החזר { "allowed": true, "kind": "ok", "category": "ok", "quote": "", "reason": "" }
+
+כללים חשובים מאוד:
+- זהו טקסט פרופיל חופשי, לא מתכון. לעולם אל תחסום טקסט רק כי אינו מתכון. כל תוכן לגיטימי מותר.
+- היה מקל. חסום רק תוכן פוגעני אמיתי מהקטגוריות לעיל. בספק — אשר (allowed=true).
+- quote: כש-kind="abuse" — צטט את הביטוי הפוגעני המדויק (כמה מילים). אחרת "".
+- reason: משפט קצר אחד בעברית שמסביר את הסיבה (יוצג למשתמש).
+- החזר JSON בלבד, ללא טקסט נוסף.`
+
 // ── Field-level sanitizers ──
 const clean    = s => (typeof s === 'string' ? s.replace(/[\x00-\x1F\x7F]/g, '').trim() : '')
 const clampStr = (s, max) => clean(s).slice(0, max)
@@ -115,7 +139,7 @@ function recipeTextBlob({ safeRecipe, safeTags }) {
 // `endpoint` is the caller's tag for usage_log / rate-limiting — never the
 // generic 'moderate-recipe' unless the caller literally is publish/update.
 // Returns { ok:false } on any failure (fail-closed), or { ok:true, verdict }.
-async function callModeration(userContent, userId, endpoint = 'moderate-recipe') {
+async function callModeration(userContent, userId, endpoint = 'moderate-recipe', system = MODERATION_SYSTEM) {
   const hasImage = Array.isArray(userContent) && userContent.some(p => p?.type === 'image')
   const model    = hasImage ? MODEL_WITH_VISION : MODEL_TEXT_ONLY
   try {
@@ -129,7 +153,7 @@ async function callModeration(userContent, userId, endpoint = 'moderate-recipe')
       body: JSON.stringify({
         model,
         max_tokens: 256,
-        system:     MODERATION_SYSTEM,
+        system,
         messages:   [{ role: 'user', content: userContent }],
       }),
     })
@@ -150,6 +174,13 @@ async function callModeration(userContent, userId, endpoint = 'moderate-recipe')
     console.error('moderation parse error:', err)
     return { ok: false }
   }
+}
+
+// Moderate a free-text profile field (bio) for abuse only. Text-only, cheap Haiku.
+// Returns { ok, verdict }; verdict.kind is 'abuse' or 'ok' (never 'junk').
+export async function moderateText({ text, userId, endpoint = 'moderate-text' }) {
+  const userContent = `בדוק את הטקסט הבא שמשתמש כתב:\n\n${clampStr(text, 4000)}`
+  return callModeration(userContent, userId, endpoint, MODERATION_SYSTEM_TEXT)
 }
 
 // ── Gate 1: moderate the RAW user input (typed text and/or uploaded photo) ──

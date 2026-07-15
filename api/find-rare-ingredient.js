@@ -27,6 +27,12 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'unauthorized', message: 'יש להתחבר.' })
   }
 
+  // ── Reject banned users before spending anything (AI tokens + paid web search) ──
+  const [security] = await adminSelect('user_security', `id=eq.${userId}&select=banned`)
+  if (security?.banned) {
+    return res.status(403).json({ error: 'banned', banned: true, banReason: 'abuse', message: 'החשבון נחסם עקב הפרות חוזרות.' })
+  }
+
   const ingredient = normalize(req.body?.ingredient)
   // country arrives in Hebrew ("ניו זילנד"); resolve to the English name so the
   // web search targets real stores, and use it as the cache key (so all users in

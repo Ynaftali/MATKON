@@ -9,11 +9,11 @@ export default function Splash() {
       </div>
 
       <div className="splash-actions">
-        <button className="btn btn-primary" onClick={() => navigate('/register')}>
-          מוכנים להיכנס למטבח
+        <button className="btn btn-glossy btn-glossy-purple" onClick={() => navigate('/login')} style={{ width: '90%', alignSelf: 'center' }}>
+          כניסה למטבח
         </button>
-        <button className="btn btn-outline" onClick={() => navigate('/login')}>
-          כניסה לחשבון
+        <button className="btn btn-glossy btn-glossy-blue" onClick={() => navigate('/register')} style={{ width: '70%', alignSelf: 'center' }}>
+          הרשמה למטבח
         </button>
       </div>
 

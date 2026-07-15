@@ -149,17 +149,6 @@ export const mockRecipes = [
   },
 ]
 
-export const mockCommunities = [
-  { id: 'c1', country_code: 'US', country_name: 'ארה"ב',     country_flag: '🇺🇸', member_count: 1247, recipes_count: 342, lat: 39.8,  lng: -98.5,  is_mine: false },
-  { id: 'c2', country_code: 'DE', country_name: 'גרמניה',    country_flag: '🇩🇪', member_count: 892,  recipes_count: 218, lat: 51.2,  lng: 10.4,   is_mine: false },
-  { id: 'c3', country_code: 'GB', country_name: 'בריטניה',   country_flag: '🇬🇧', member_count: 756,  recipes_count: 189, lat: 52.4,  lng: -1.5,   is_mine: false },
-  { id: 'c4', country_code: 'FR', country_name: 'צרפת',      country_flag: '🇫🇷', member_count: 623,  recipes_count: 156, lat: 46.2,  lng: 2.2,    is_mine: false },
-  { id: 'c5', country_code: 'AU', country_name: 'אוסטרליה',  country_flag: '🇦🇺', member_count: 445,  recipes_count: 112, lat: -25.3, lng: 133.8,  is_mine: false },
-  { id: 'c6', country_code: 'CA', country_name: 'קנדה',      country_flag: '🇨🇦', member_count: 398,  recipes_count: 98,  lat: 56.1,  lng: -106.3, is_mine: false },
-  { id: 'c7', country_code: 'NL', country_name: 'הולנד',     country_flag: '🇳🇱', member_count: 287,  recipes_count: 72,  lat: 52.1,  lng: 5.3,    is_mine: false },
-  { id: 'c8', country_code: 'NZ', country_name: 'ניו זילנד', country_flag: '🇳🇿', member_count: 156,  recipes_count: 43,  lat: -40.9, lng: 174.9,  is_mine: true },
-]
-
 export const COUNTRIES = [
   'אוזבקיסטן', 'אוסטרליה', 'אוסטריה', 'אוקראינה', 'איטליה', 'אירלנד', 'איסלנד',
   'אמירויות הערביות', 'אנגולה', 'ארגנטינה', 'ארה"ב',

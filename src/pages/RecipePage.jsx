@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
-  IconChevronRight, IconChevronDown, IconShare, IconClock, IconUsers, IconStar,
-  IconMessageCircle, IconShoppingCart, IconAlertTriangle, IconExternalLink,
-  IconHeart, IconBookmark, IconSend, IconCheck, IconCamera, IconPencil
+  IconChevronRight, IconShare, IconClock, IconUsers, IconStar,
+  IconMessageCircle, IconShoppingCart, IconExternalLink,
+  IconHeart, IconBookmark, IconSend, IconCheck, IconCamera, IconPencil, IconLock
 } from '@tabler/icons-react'
 import { mockRecipes, CATEGORY_GRADIENTS, countryFlag } from '../lib/mock'
 import { supabase } from '../lib/supabase'
@@ -21,6 +21,14 @@ function timeAgo(ts) {
   const h = Math.floor(m / 60)
   if (h < 24) return `לפני ${h} שעות`
   return `לפני ${Math.floor(h / 24)} ימים`
+}
+
+// Canonical author display: first name + last-name initial (no city). e.g. "נפתלי כ."
+function authorName(fullName) {
+  const parts = (fullName || '').trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return 'אנונימי'
+  if (parts.length === 1) return parts[0]
+  return `${parts[0]} ${parts[1][0]}.`
 }
 
 export default function RecipePage() {
@@ -48,8 +56,11 @@ export default function RecipePage() {
   const [sending, setSending]       = useState(false)
   const [, setTick]                 = useState(0)  // forces timeAgo to refresh while page is open
   const { user: currentUser, profile } = useAuth()
+  // Guest (arrived via a shared link, no account): can view the recipe but every
+  // action is gated behind a "register first" popup. See ux_ui מסך 9.
+  const isGuest = !currentUser
+  const [gateOpen, setGateOpen] = useState(false)
   const commentsEndRef = useRef(null)
-  const [rareStores, setRareStores] = useState({}) // { [idx]: { open, loading, stores, error } }
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 60_000)
@@ -124,7 +135,7 @@ export default function RecipePage() {
   }
 
   async function toggleSave() {
-    if (!currentUser) { navigate('/login'); return }
+    if (!currentUser) { setGateOpen(true); return }
     if (saveLoading) return
     setSaveLoading(true)
     if (saved) {
@@ -159,25 +170,33 @@ export default function RecipePage() {
 
   async function sendComment() {
     if (!newComment.trim() || sending) return
+    // Comments are free public text and must pass server-side moderation, so
+    // they go through /api/add-comment (the client can no longer insert into
+    // recipe_comments directly — see migration enforce_comment_moderation).
     setSending(true)
     try {
-      const { data, error } = await supabase
-        .from('recipe_comments')
-        .insert({ recipe_id: id, user_id: currentUser.id, content: newComment.trim() })
-        .select('id, content, created_at, users(full_name, country)')
-        .single()
-      if (!error && data) {
-        setComments(c => [...c, data])
-        setNewComment('')
-        setTimeout(() => commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
-      }
+      const { data: { session } } = await supabase.auth.getSession()
+      const resp = await fetch('/api/add-comment', {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
+        },
+        body: JSON.stringify({ recipe_id: id, content: newComment.trim() }),
+      })
+      const body = await resp.json().catch(() => ({}))
+      if (body.banned) { navigate('/blocked'); return }
+      if (!resp.ok) { showToast(body.message || 'שליחת התגובה נכשלה'); return }
+      setNewComment('')
+      await loadComments(id)
+      setTimeout(() => commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
     } finally {
       setSending(false)
     }
   }
 
   async function toggleLike() {
-    if (!currentUser) { navigate('/login'); return }
+    if (!currentUser) { setGateOpen(true); return }
     if (likeLoading) return
     setLikeLoading(true)
     if (liked) {
@@ -193,35 +212,6 @@ export default function RecipePage() {
     setLikeLoading(false)
   }
 
-  async function toggleRareStores(idx, ingredientName) {
-    const current = rareStores[idx]
-    if (current?.open) {
-      setRareStores(prev => ({ ...prev, [idx]: { ...prev[idx], open: false } }))
-      return
-    }
-    if (current?.stores || current?.loading) {
-      setRareStores(prev => ({ ...prev, [idx]: { ...prev[idx], open: true } }))
-      return
-    }
-    setRareStores(prev => ({ ...prev, [idx]: { open: true, loading: true, stores: null, error: false } }))
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch('/api/find-rare-ingredient', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` },
-        body: JSON.stringify({ ingredient: ingredientName, country: profile?.country || '' }),
-      })
-      if (res.ok) {
-        const { stores } = await res.json()
-        setRareStores(prev => ({ ...prev, [idx]: { open: true, loading: false, stores: stores || [], error: false } }))
-      } else {
-        setRareStores(prev => ({ ...prev, [idx]: { open: true, loading: false, stores: [], error: true } }))
-      }
-    } catch {
-      setRareStores(prev => ({ ...prev, [idx]: { open: true, loading: false, stores: [], error: true } }))
-    }
-  }
-
   function logShare(channel) {
     // Fire-and-forget: feeds the popularity ranking (likes + distinct sharers).
     if (!currentUser?.id) return
@@ -229,6 +219,7 @@ export default function RecipePage() {
   }
 
   async function handleShare() {
+    if (!currentUser) { setGateOpen(true); return }
     const url = `https://matkon.co/recipe/${id}`
     if (navigator.share) {
       try { await navigator.share({ title: recipe.title, text: recipe.description, url }); logShare('native') } catch {}
@@ -369,7 +360,7 @@ export default function RecipePage() {
   )
 
   return (
-    <div className="rpage">
+    <div className="rpage page-with-nav">
       {/* Hero — image_url is set server-side by publish-recipe *after* moderation,
           so we trust it. If empty (legacy/seed), fall back to the category gradient
           rather than generating an unmoderated AI image on the client. */}
@@ -399,7 +390,7 @@ export default function RecipePage() {
               </>
             )}
             <button
-              className={`btn-icon like-btn${liked ? ' liked' : ''}`}
+              className={`btn-icon like-btn${liked ? ' liked' : ''}${isGuest ? ' gated' : ''}`}
               onClick={toggleLike}
               disabled={likeLoading}
               aria-label={liked ? 'הסירו מהאהובים' : 'הוסיפו לאהובים'}
@@ -407,14 +398,14 @@ export default function RecipePage() {
               <IconHeart size={20} fill={liked ? '#e05252' : 'none'} color={liked ? '#e05252' : 'currentColor'} />
             </button>
             <button
-              className={`btn-icon${saved ? ' liked' : ''}`}
+              className={`btn-icon${saved ? ' liked' : ''}${isGuest ? ' gated' : ''}`}
               onClick={toggleSave}
               disabled={saveLoading}
               aria-label={saved ? 'הסירו מהשמורים' : 'שמרו מתכון'}
             >
               <IconBookmark size={20} fill={saved ? 'var(--blue-light)' : 'none'} color={saved ? 'var(--blue-light)' : 'currentColor'} />
             </button>
-            <button className="btn-icon" onClick={handleShare} aria-label="שיתוף">
+            <button className={`btn-icon${isGuest ? ' gated' : ''}`} onClick={handleShare} aria-label="שיתוף">
               <IconShare size={20} />
             </button>
           </div>
@@ -426,9 +417,9 @@ export default function RecipePage() {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
           <div className="rpage-title" style={{ marginBottom: 0 }}>{recipe.title}</div>
           <button
-            className="btn btn-green"
+            className={`btn btn-green${isGuest ? ' gated' : ''}`}
             style={{ width: 'auto', padding: '10px 20px', fontSize: '.9rem', flexShrink: 0, borderRadius: 24, marginTop: 4 }}
-            onClick={() => navigate(`/cook/${recipe.id}`, { state: { recipe } })}
+            onClick={() => isGuest ? setGateOpen(true) : navigate(`/cook/${recipe.id}`, { state: { recipe } })}
           >
             התחילו לבשל
           </button>
@@ -437,8 +428,7 @@ export default function RecipePage() {
         {/* Author (per Brief: flags + first name only — no avatar) */}
         <div className="rpage-author">
           <div className="rpage-author-info">
-            <div className="rpage-author-name">🇮🇱 {countryFlag(user.country)} {(user.full_name || '').split(' ')[0]}</div>
-            <div className="rpage-author-loc">{user.country || ''}</div>
+            <div className="rpage-author-name">{countryFlag(user.country)} 🇮🇱 {authorName(user.full_name)}</div>
           </div>
         </div>
 
@@ -490,40 +480,15 @@ export default function RecipePage() {
             const name = ing.name_he || ing.name || ''
             const qty  = ing.quantity || ing.amount || ''
             const unit = ing.unit || ''
-            const rare = rareStores[idx]
+            // Note: the "rare ingredient" finder lives only in the shopping list,
+            // not on the recipe page (product decision — it's a shopping concern).
             return (
-              <div key={ing.id || idx}>
-                <div className="ingredient-row">
-                  <div className="ingredient-qty">{fmtQty(qty)} {unit}</div>
-                  <div className="ingredient-names">
-                    <div className="ingredient-he">{name}</div>
-                    {ing.name_local && <div className="ingredient-local">{ing.name_local}</div>}
-                  </div>
-                  {ing.is_rare && (
-                    <button
-                      type="button"
-                      className="tag tag-rare rare-toggle"
-                      onClick={() => toggleRareStores(idx, ing.name_local || name)}
-                    >
-                      <IconAlertTriangle size={11} /> נדיר
-                      <IconChevronDown size={12} className={rare?.open ? 'rare-chevron open' : 'rare-chevron'} />
-                    </button>
-                  )}
+              <div key={ing.id || idx} className="ingredient-row">
+                <div className="ingredient-qty">{fmtQty(qty)} {unit}</div>
+                <div className="ingredient-names">
+                  <div className="ingredient-he">{name}</div>
+                  {ing.name_local && <div className="ingredient-local">{ing.name_local}</div>}
                 </div>
-                {rare?.open && (
-                  <div className="rare-dropdown">
-                    {rare.loading && <div className="rare-dropdown-msg">מחפש חנויות…</div>}
-                    {!rare.loading && rare.error && <div className="rare-dropdown-msg">לא הצלחנו לחפש כרגע. נסו שוב מאוחר יותר.</div>}
-                    {!rare.loading && !rare.error && rare.stores?.length === 0 && (
-                      <div className="rare-dropdown-msg">לא נמצאו חנויות ספציפיות.</div>
-                    )}
-                    {!rare.loading && rare.stores?.map((store, sIdx) => (
-                      <a key={sIdx} href={store.url} target="_blank" rel="noopener noreferrer" className="rare-store-link">
-                        {store.name} <IconExternalLink size={13} />
-                      </a>
-                    ))}
-                  </div>
-                )}
               </div>
             )
           })}
@@ -549,8 +514,16 @@ export default function RecipePage() {
           })}
         </div>
 
+        <button className={`btn btn-glossy btn-glossy-yellow${isGuest ? ' gated' : ''}`} onClick={() => {
+          if (isGuest) { setGateOpen(true); return }
+          addIngredientsToList(recipe.ingredients || [], recipe.title)
+          openShopping()
+        }}>
+          <IconShoppingCart size={18} /> הוסיפו לרשימת הקניות
+        </button>
+
         {/* Comments */}
-        <div className="rpage-section comments-section">
+        <div className="rpage-section comments-section" style={{ marginTop: 24 }}>
           <div className="comments-title">
             תגובות ({comments.length || recipe.comments_count || 0})
           </div>
@@ -581,7 +554,7 @@ export default function RecipePage() {
             <div className="comments-empty">היו הראשונים להגיב</div>
           )}
 
-          {currentUser ? (
+          {currentUser && (
             <div className="comment-input-row">
               <textarea
                 className="comment-input"
@@ -600,20 +573,33 @@ export default function RecipePage() {
                 <IconSend size={18} />
               </button>
             </div>
-          ) : (
-            <div className="comment-join">
-              <a onClick={() => navigate('/register')}>הצטרפו לקהילה</a> כדי להגיב
+          )}
+
+          {isGuest && (
+            <div className="comment-input-row gated" onClick={() => setGateOpen(true)}>
+              <textarea className="comment-input" placeholder="כתבו תגובה..." rows={1} readOnly style={{ pointerEvents: 'none' }} />
+              <button className="comment-send-btn" aria-label="שלחו תגובה" tabIndex={-1}>
+                <IconSend size={18} />
+              </button>
             </div>
           )}
         </div>
-
-        <button className="btn btn-ghost" onClick={() => {
-          addIngredientsToList(recipe.ingredients || [], recipe.title)
-          openShopping()
-        }}>
-          <IconShoppingCart size={18} /> הוסף לרשימת קניות
-        </button>
       </div>
+
+      {/* Guest gate — every action requires an account */}
+      {gateOpen && (
+        <div className="gate-overlay" onClick={() => setGateOpen(false)}>
+          <div className="gate-card" onClick={e => e.stopPropagation()}>
+            <div className="gate-icon"><IconLock size={26} /></div>
+            <div className="gate-title">רק רגע — צריך חשבון</div>
+            <div className="gate-body">כדי לבשל, לשמור מתכונים, להוסיף לרשימת קניות ולהגיב — צריך להצטרף לקהילה. זה בחינם ולוקח דקה.</div>
+            <div className="gate-actions">
+              <button className="btn btn-glossy btn-glossy-purple" onClick={() => navigate('/register')}>הרשמה למטבח</button>
+              <span className="gate-login" onClick={() => navigate('/login')}>כבר יש לי חשבון? כניסה</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {toast && (
@@ -668,7 +654,7 @@ export default function RecipePage() {
         </div>
       )}
 
-      <BottomNav />
+      <BottomNav locked={isGuest} onLocked={() => setGateOpen(true)} />
     </div>
   )
 }

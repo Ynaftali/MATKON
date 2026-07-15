@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { IconChevronRight, IconPlayerPlay, IconPlayerPause, IconRotate, IconCheck } from '@tabler/icons-react'
+import { IconChevronRight, IconPlayerPlay, IconPlayerPause, IconRotate, IconCheck, IconHeart, IconBookmark, IconShare } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
-import { mockRecipes } from '../lib/mock'
+import { mockRecipes, CATEGORY_GRADIENTS } from '../lib/mock'
+import { useAuth } from '../lib/AuthContext'
+import BottomNav from '../components/BottomNav'
 
 function parseHebrewDuration(text) {
   if (!text) return null
@@ -35,6 +37,31 @@ function fmtCountdown(s) {
   const sec = s % 60
   if (h > 0) return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
   return `${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`
+}
+
+// Timer-done alarm: three rising beeps via Web Audio (no asset needed). Tapping
+// "הפעל" already unlocked audio, so this is allowed to play. Plus a vibration
+// pattern on phones that support it (Android; iOS Safari ignores it harmlessly).
+let _audioCtx = null
+function timerAlarm() {
+  try {
+    _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)()
+    const ctx = _audioCtx
+    if (ctx.state === 'suspended') ctx.resume()
+    ;[0, 0.35, 0.7].forEach(t => {
+      const osc  = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.value = 880
+      const start = ctx.currentTime + t
+      gain.gain.setValueAtTime(0.0001, start)
+      gain.gain.exponentialRampToValueAtTime(0.35, start + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.28)
+      osc.connect(gain); gain.connect(ctx.destination)
+      osc.start(start); osc.stop(start + 0.3)
+    })
+  } catch { /* audio unavailable — the visual + vibration still fire */ }
+  try { navigator.vibrate?.([300, 150, 300, 150, 300]) } catch {}
 }
 
 function StepTimer({ durationSeconds, storageKey }) {
@@ -82,6 +109,7 @@ function StepTimer({ durationSeconds, storageKey }) {
             setRunning(false)
             setFinished(true)
             persist(0, false, true, null)
+            timerAlarm()
             return 0
           }
           return next
@@ -112,7 +140,7 @@ function StepTimer({ durationSeconds, storageKey }) {
   return (
     <div className={`step-timer ${finished ? 'done' : running ? 'running' : ''}`} onClick={e => e.stopPropagation()}>
       <div className="step-timer-display">
-        {finished ? '✓ הסתיים' : fmtCountdown(remaining)}
+        {finished ? '⏰ נגמר הזמן!' : fmtCountdown(remaining)}
       </div>
       <div className="step-timer-controls">
         <button className="step-timer-btn" onClick={toggleRunning} disabled={finished}>
@@ -143,6 +171,15 @@ export default function CookingMode() {
     catch { return 0 }
   })
 
+  // Recipe actions in cooking mode — users may want to like/save/share mid-cook.
+  const { user: currentUser } = useAuth()
+  const [liked, setLiked]             = useState(false)
+  const [saved, setSaved]             = useState(false)
+  const [likeLoading, setLikeLoading] = useState(false)
+  const [saveLoading, setSaveLoading] = useState(false)
+  const [toast, setToast]             = useState('')
+  function showToast(m) { setToast(m); setTimeout(() => setToast(''), 2200) }
+
   useEffect(() => {
     if (state?.recipe) return // already have recipe from navigation
     async function load() {
@@ -160,6 +197,47 @@ export default function CookingMode() {
   useEffect(() => {
     try { localStorage.setItem(`matkon_cook_step_${id}`, String(activeStep)) } catch {}
   }, [activeStep])
+
+  // Liked/saved state — keyed on user (auth resolves async, after first render).
+  useEffect(() => {
+    if (!currentUser?.id) return
+    supabase.from('likes').select('id').eq('recipe_id', id).eq('user_id', currentUser.id).maybeSingle().then(({ data }) => setLiked(!!data))
+    supabase.from('saved').select('id').eq('recipe_id', id).eq('user_id', currentUser.id).maybeSingle().then(({ data }) => setSaved(!!data))
+  }, [currentUser?.id, id])
+
+  async function toggleLike() {
+    if (!currentUser) { navigate('/login'); return }
+    if (likeLoading) return
+    setLikeLoading(true)
+    if (liked) {
+      const { error } = await supabase.from('likes').delete().eq('recipe_id', id).eq('user_id', currentUser.id)
+      if (!error) setLiked(false)
+    } else {
+      const { error } = await supabase.from('likes').insert({ recipe_id: id, user_id: currentUser.id })
+      if (!error || error.code === '23505') setLiked(true)
+    }
+    setLikeLoading(false)
+  }
+
+  async function toggleSave() {
+    if (!currentUser) { navigate('/login'); return }
+    if (saveLoading) return
+    setSaveLoading(true)
+    if (saved) {
+      const { error } = await supabase.from('saved').delete().eq('recipe_id', id).eq('user_id', currentUser.id)
+      if (!error) { setSaved(false); showToast('הוסר מהשמורים') }
+    } else {
+      const { error } = await supabase.from('saved').insert({ recipe_id: id, user_id: currentUser.id })
+      if (!error || error.code === '23505') { setSaved(true); showToast('נשמר ✓') }
+    }
+    setSaveLoading(false)
+  }
+
+  async function handleShare() {
+    const url = `https://matkon.co/recipe/${id}`
+    if (navigator.share) { try { await navigator.share({ title: recipe?.title, url }) } catch {} }
+    else { try { await navigator.clipboard.writeText(url); showToast('הקישור הועתק ✓') } catch {} }
+  }
 
   if (loading) return (
     <div className="cook-page" style={{ display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -210,14 +288,31 @@ export default function CookingMode() {
   }
 
   return (
-    <div className="cook-page">
-      <div className="topbar">
-        <button className="btn-icon" onClick={() => navigate(-1)}>
-          <IconChevronRight size={20} />
-        </button>
-        <span className="topbar-title">{recipe.title}</span>
-        <div style={{ width:40 }} />
+    <div className="cook-page page-with-nav">
+      <div className="rpage-hero" style={{ background: CATEGORY_GRADIENTS[recipe.category] || 'linear-gradient(160deg,#1e3a6e,#3d6fa8)' }}>
+        {recipe.image_url && (
+          <img src={recipe.image_url} alt={recipe.title} className="rpage-hero-bg" onError={e => { e.target.style.display = 'none' }} />
+        )}
+        <div className="rpage-hero-overlay" />
+        <div className="rpage-hero-top">
+          <button className="btn-icon" onClick={() => navigate(-1)}>
+            <IconChevronRight size={20} />
+          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className={`btn-icon like-btn${liked ? ' liked' : ''}`} onClick={toggleLike} disabled={likeLoading} aria-label={liked ? 'הסירו מהאהובים' : 'הוסיפו לאהובים'}>
+              <IconHeart size={20} fill={liked ? '#e05252' : 'none'} color={liked ? '#e05252' : 'currentColor'} />
+            </button>
+            <button className={`btn-icon${saved ? ' liked' : ''}`} onClick={toggleSave} disabled={saveLoading} aria-label={saved ? 'הסירו מהשמורים' : 'שמרו מתכון'}>
+              <IconBookmark size={20} fill={saved ? 'var(--blue-light)' : 'none'} color={saved ? 'var(--blue-light)' : 'currentColor'} />
+            </button>
+            <button className="btn-icon" onClick={handleShare} aria-label="שיתוף">
+              <IconShare size={20} />
+            </button>
+          </div>
+        </div>
       </div>
+
+      <div className="cook-title">{recipe.title}</div>
 
       <div className="cook-steps">
         {steps.map((step, i) => {
@@ -256,6 +351,9 @@ export default function CookingMode() {
           )
         })}
       </div>
+
+      {toast && <div className="toast">{toast}</div>}
+      <BottomNav />
     </div>
   )
 }

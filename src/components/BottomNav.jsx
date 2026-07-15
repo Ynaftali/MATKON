@@ -3,18 +3,23 @@ import { useState, useEffect } from 'react'
 import { IconHome2, IconShoppingCart, IconPlus, IconBook2, IconUser } from '@tabler/icons-react'
 import { shoppingCount } from '../lib/shopping'
 
+// Center slot = "מתכונים" (raised, primary destination — where users come to browse).
+// "+" (add) sits in a side slot with a distinct color so it stands out.
 const items = [
-  { icon: IconHome2,       label: 'פיד',    path: '/feed'     },
-  { icon: IconShoppingCart, label: 'קניות',  path: '/shopping' },
-  null,
-  { icon: IconBook2,       label: 'מתכונים', path: '/recipes' },
-  { icon: IconUser,        label: 'פרופיל',  path: '/profile' },
+  { icon: IconHome2,        label: 'פיד',      path: '/feed'     },
+  { icon: IconShoppingCart, label: 'קניות',    path: '/shopping' },
+  { type: 'center', icon: IconBook2, label: 'מתכונים', path: '/recipes' },
+  { type: 'add',    icon: IconPlus,  label: 'הוספה',   path: '/add'     },
+  { icon: IconUser,         label: 'פרופיל',   path: '/profile'  },
 ]
 
-export default function BottomNav() {
+// `locked` dims the whole bar and routes every tap to `onLocked` instead of
+// navigating — used for guests on a shared recipe link (must register first).
+export default function BottomNav({ locked = false, onLocked }) {
   const navigate     = useNavigate()
   const { pathname } = useLocation()
   const [count, setCount] = useState(shoppingCount)
+  const go = path => locked ? onLocked?.() : navigate(path)
 
   // Refresh badge when localStorage changes
   useEffect(() => {
@@ -26,18 +31,28 @@ export default function BottomNav() {
   }, [])
 
   return (
-    <nav className="bottom-nav">
+    <nav className={`bottom-nav${locked ? ' locked' : ''}`}>
       {items.map((item, i) => {
-        if (!item) return (
-          <button key="add" className="nav-add" onClick={() => navigate('/add')}>
-            <IconPlus size={26} color="#fff" />
-          </button>
-        )
         const Icon   = item.icon
         const active = pathname.startsWith(item.path)
+
+        if (item.type === 'center') return (
+          <button key={i} className={`nav-center ${active ? 'active' : ''}`} onClick={() => go(item.path)}>
+            <span className="nav-center-orb"><Icon size={26} color="#fff" /></span>
+            <span>{item.label}</span>
+          </button>
+        )
+
+        if (item.type === 'add') return (
+          <button key={i} className="nav-add-side" onClick={() => go(item.path)}>
+            <span className="nav-add-orb"><Icon size={22} color="#fff" /></span>
+            <span>{item.label}</span>
+          </button>
+        )
+
         const isShopping = item.path === '/shopping'
         return (
-          <button key={i} className={`nav-item ${active ? 'active' : ''}`} onClick={() => navigate(item.path)}>
+          <button key={i} className={`nav-item ${active ? 'active' : ''}`} onClick={() => go(item.path)}>
             <div style={{ position:'relative', display:'inline-flex' }}>
               <Icon size={22} />
               {isShopping && count > 0 && (

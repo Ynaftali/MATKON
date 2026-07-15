@@ -1,4 +1,4 @@
-import { adminInsert, adminCount, getUserFromToken } from './_supabase.js'
+import { adminInsert, adminCount, adminSelect, getUserFromToken } from './_supabase.js'
 import { checkAiBudget } from './_budget.js'
 import { resolveCountry } from './_countries.js'
 
@@ -21,6 +21,12 @@ export default async function handler(req, res) {
   // is an open cost hole. Translation only happens for a logged-in user's recipe.
   if (!userId) {
     return res.status(401).json({ error: 'unauthorized', message: 'יש להתחבר.' })
+  }
+
+  // ── Reject banned users before spending AI tokens ──
+  const [security] = await adminSelect('user_security', `id=eq.${userId}&select=banned`)
+  if (security?.banned) {
+    return res.status(403).json({ error: 'banned', banned: true, banReason: 'abuse', message: 'החשבון נחסם עקב הפרות חוזרות.' })
   }
 
   const { ingredients, country } = req.body || {}

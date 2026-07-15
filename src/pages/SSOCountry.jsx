@@ -11,26 +11,60 @@ import AppHeader from '../components/AppHeader'
 // need explicit Terms-of-Service consent before the user enters the app.
 export default function SSOCountry() {
   const navigate = useNavigate()
-  const { user, loading } = useAuth()
+  const { user, profile, loading, refreshProfile } = useAuth()
   const [country, setCountry] = useState('')
   const [tos, setTos]         = useState(false)
+  const [inviteCode, setInviteCode] = useState('')
+  const [inviteOnly, setInviteOnly] = useState(true)
   const [saving, setSaving]   = useState(false)
   const [error, setError]     = useState('')
 
-  // TEMP-PREVIEW: allow rendering without auth when ?preview=1 (design review only)
-  const previewMode = new URLSearchParams(window.location.search).get('preview') === '1'
+  // Invite gate (closed launch): OAuth accounts are created un-redeemed and
+  // blocked until a code is redeemed here. Someone who already redeemed on a
+  // previous attempt (e.g. country save failed after the burn) is not asked again.
+  // When the gate is off (invite_only=false) no code is needed at all.
+  const alreadyRedeemed = !!profile?.invite_redeemed_at
+  const code = inviteCode.trim().toUpperCase()
+  const needsCode = inviteOnly && !alreadyRedeemed
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/invite-status')
+      .then(r => r.json())
+      .then(d => { if (!cancelled) setInviteOnly(d.inviteOnly !== false) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   // Only reachable after an OAuth sign-in — bounce anyone else to login.
   useEffect(() => {
-    if (previewMode) return
     if (!loading && !user) navigate('/login', { replace: true })
   }, [loading, user])
 
-  const valid = COUNTRIES.includes(country) && tos
+  const valid = COUNTRIES.includes(country) && tos && (!needsCode || code.length >= 4)
 
   async function save() {
     if (!valid || saving || !user) return
     setSaving(true); setError('')
+
+    // Burn the invite code first (server-side, atomic). Only after it succeeds do
+    // we save the profile — an un-redeemed OAuth account has no app access.
+    if (needsCode) {
+      const { data: { session } } = await supabase.auth.getSession()
+      const resp = await fetch('/api/redeem-invite', {
+        method:  'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          Authorization:   `Bearer ${session?.access_token || ''}`,
+        },
+        body: JSON.stringify({ code }),
+      })
+      const body = await resp.json().catch(() => ({}))
+      if (body.banned) { navigate('/blocked', { replace: true }); return }
+      if (!resp.ok) { setError(body.message || 'קוד ההזמנה שגוי או שכבר נוצל.'); setSaving(false); return }
+      await refreshProfile()
+    }
+
     const { error } = await supabase
       .from('users')
       .update({ country, tos_accepted_at: new Date().toISOString() })
@@ -54,7 +88,7 @@ export default function SSOCountry() {
     navigate('/complete-profile', { replace: true })
   }
 
-  if (!previewMode && (loading || !user)) return null
+  if (loading || !user) return null
 
   return (
     <div className="auth-page">
@@ -63,6 +97,22 @@ export default function SSOCountry() {
       </AppHeader>
 
       <div className="auth-form">
+        {needsCode && (
+          <div className="auth-field">
+            <label className="auth-label">קוד הזמנה</label>
+            <input
+              className="input"
+              type="text"
+              placeholder="הקוד שקיבלתם, למשל A7K9-Q4MP"
+              value={inviteCode}
+              onChange={e => setInviteCode(e.target.value)}
+              autoComplete="off"
+              autoCapitalize="characters"
+              style={{ textTransform: 'uppercase' }}
+            />
+          </div>
+        )}
+
         <div className="auth-field">
           <label className="auth-label">מדינת מגורים</label>
           <CountrySelect value={country} onChange={setCountry} />

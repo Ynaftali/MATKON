@@ -1,94 +1,17 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconEdit, IconLock, IconShare, IconLogout, IconX, IconDownload, IconTrash } from '@tabler/icons-react'
-import { CATEGORY_GRADIENTS, countryFlag } from '../lib/mock'
+import { IconEdit, IconLock, IconLogout, IconX, IconDownload, IconTrash, IconKey } from '@tabler/icons-react'
+import { countryFlag } from '../lib/mock'
 import { supabase, canUsePasskeys, isPasskeyCancel } from '../lib/supabase'
+import { passwordValid } from '../lib/passwordRules'
 import { useAuth } from '../lib/AuthContext'
 import BottomNav from '../components/BottomNav'
+import AppHeader from '../components/AppHeader'
+import RecipeCard from '../components/RecipeCard'
 import PasskeySection from '../components/PasskeySection'
-
-const COUNTRIES = [
-  'ניו זילנד','אוסטרליה','ארה"ב','קנדה','בריטניה','גרמניה','צרפת','הולנד',
-  'בלגיה','שוויץ','אוסטריה','ספרד','איטליה','פורטוגל','שבדיה','נורווגיה',
-  'דנמרק','פינלנד','פולין','צ\'כיה','הונגריה','יוון','קפריסין','תאילנד',
-  'סינגפור','הודו','יפן','דרום אפריקה','ברזיל','ארגנטינה','מקסיקו','ישראל','אחר',
-]
-
-function ProfileRecipeItem({ recipe, onClick }) {
-  const gradient = CATEGORY_GRADIENTS[recipe.category] || 'linear-gradient(160deg,#1e3a6e,#3d6fa8)'
-  const bgStyle  = recipe.image_url
-    ? { backgroundImage:`url(${recipe.image_url})`, backgroundSize:'cover', backgroundPosition:'center' }
-    : { background: gradient }
-  return (
-    <div className="profile-recipe-item" onClick={onClick}>
-      <div className="profile-recipe-thumb">
-        <div className="profile-recipe-thumb-bg" style={bgStyle} />
-      </div>
-      <div className="profile-recipe-info">
-        <div className="profile-recipe-title">{recipe.title}</div>
-        <div className="profile-recipe-meta">{recipe.category} · {(recipe.prep_time||0)+(recipe.cook_time||0)} דקות</div>
-        <div className="profile-recipe-tags">
-          {!recipe.is_public
-            ? <span className="tag tag-blue"><IconLock size={10} /> אישי</span>
-            : <span className="tag tag-green"><IconShare size={10} /> משותף</span>
-          }
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function EditModal({ profile, onClose, onSave }) {
-  const [form, setForm] = useState({
-    full_name: profile?.full_name || '',
-    country:   profile?.country   || '',
-    bio:       profile?.bio       || '',
-  })
-  const [saving, setSaving] = useState(false)
-
-  const set = field => e => setForm(f => ({ ...f, [field]: e.target.value }))
-
-  async function save() {
-    setSaving(true)
-    await onSave(form)
-    setSaving(false)
-  }
-
-  return (
-    <div className="drawer-overlay" onClick={onClose}>
-      <div className="drawer" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
-        <div className="drawer-header">
-          <span className="drawer-title">עריכת פרופיל</span>
-          <button className="btn-icon" onClick={onClose}><IconX size={18} /></button>
-        </div>
-        <div className="drawer-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-          <div>
-            <label style={{ fontSize: '.85rem', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>שם מלא</label>
-            <input className="input" value={form.full_name} onChange={set('full_name')} placeholder="שם מלא" />
-          </div>
-
-          <div>
-            <label style={{ fontSize: '.85rem', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>מדינת מגורים</label>
-            <select className="input" value={form.country} onChange={set('country')}>
-              <option value="">בחרו מדינה</option>
-              {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label style={{ fontSize: '.85rem', color: 'var(--text-muted)', display: 'block', marginBottom: 4 }}>משפט קצר עליי</label>
-            <textarea className="input" value={form.bio} onChange={set('bio')} placeholder="ספרו קצת על עצמכם..." rows={3} style={{ resize: 'none' }} />
-          </div>
-
-          <button className="btn btn-primary" onClick={save} disabled={saving}>
-            {saving ? 'שומרים...' : 'שמירה'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
+import NameFields from '../components/NameFields'
+import CountrySelect from '../components/CountrySelect'
+import PasswordInput from '../components/PasswordInput'
 
 export default function Profile() {
   const navigate = useNavigate()
@@ -99,8 +22,14 @@ export default function Profile() {
   const [saved, setSaved]         = useState([])
   const [savedLoading, setSavedLoading] = useState(false)
   const [editOpen, setEditOpen]   = useState(false)
+  const [editForm, setEditForm]   = useState({ firstName: '', lastName: '', country: '', bio: '' })
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [newEmail, setNewEmail]   = useState('')
+  const [emailBusy, setEmailBusy] = useState(false)
+  const [curPw, setCurPw]         = useState('')
+  const [newPw, setNewPw]         = useState('')
+  const [pwBusy, setPwBusy]       = useState(false)
   const [toast, setToast]         = useState('')
-  const [privacyOpen, setPrivacyOpen] = useState(false)
   const [confirmText, setConfirmText] = useState('')
   const [busy, setBusy]           = useState(false)
   const [likesCount, setLikesCount] = useState(0)
@@ -116,8 +45,8 @@ export default function Profile() {
   }, [user, authLoading])
 
   useEffect(() => {
-    if (privacyOpen && showPasskeys) loadPasskeys()
-  }, [privacyOpen])
+    if (editOpen && showPasskeys) loadPasskeys()
+  }, [editOpen])
 
   async function loadPasskeys() {
     const { data } = await supabase.auth.passkey.list()
@@ -190,22 +119,93 @@ export default function Profile() {
     setSavedLoading(false)
   }
 
-  async function saveProfile(form) {
-    const { error } = await supabase
-      .from('users')
-      .update({
-        full_name: form.full_name,
-        country:   form.country,
-        bio:       form.bio,
-      })
-      .eq('id', user.id)
+  // Open the edit sheet — split the stored full_name back into first / last
+  // (registration stores it as "first last"; first token = first name).
+  function openEdit() {
+    const nm = (activeProfile?.full_name || '').trim()
+    const sp = nm.indexOf(' ')
+    setEditForm({
+      firstName: sp === -1 ? nm : nm.slice(0, sp),
+      lastName:  sp === -1 ? '' : nm.slice(sp + 1),
+      country:   activeProfile?.country || '',
+      bio:       activeProfile?.bio     || '',
+    })
+    setNewEmail(''); setCurPw(''); setNewPw(''); setConfirmText('')
+    setEditOpen(true)
+  }
 
-    if (!error) {
+  async function saveProfile() {
+    // Bio is free public text and must pass server-side moderation, so the whole
+    // profile update goes through /api/update-profile (the client can no longer
+    // write the bio column directly — see migration enforce_bio_moderation).
+    setSavingProfile(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const resp = await fetch('/api/update-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
+        },
+        body: JSON.stringify({
+          full_name: `${editForm.firstName} ${editForm.lastName}`.trim(),
+          country:   editForm.country,
+          bio:       editForm.bio,
+        }),
+      })
+      const body = await resp.json().catch(() => ({}))
+      // banned can arrive as 403 (already banned) or 422 (this bio was the
+      // strike that crossed the threshold) — handle both.
+      if (body.banned) { navigate('/blocked'); return }
+      if (!resp.ok) {
+        setToast(body.message || 'העדכון נכשל. נסו שוב.')
+        setTimeout(() => setToast(''), 3500)
+        return
+      }
       await refreshProfile()
-      setEditOpen(false)
       setToast('הפרופיל עודכן ✓')
       setTimeout(() => setToast(''), 2500)
+    } finally {
+      setSavingProfile(false)
     }
+  }
+
+  // ── Change Email: Supabase sends a confirmation link to the new address; the
+  // change only lands after the user clicks it. Email lives in auth.users only.
+  async function changeEmail() {
+    if (!emailChangeValid) return
+    setEmailBusy(true)
+    const { error } = await supabase.auth.updateUser({ email: newEmail.trim() })
+    setEmailBusy(false)
+    setToast(error ? `עדכון ה-Email נכשל: ${error.message}` : 'שלחנו לינק אישור לכתובת החדשה')
+    if (!error) setNewEmail('')
+    setTimeout(() => setToast(''), 3500)
+  }
+
+  // ── Change Password: verify the current password (re-auth) before setting the
+  // new one, so a hijacked session can't silently change it (highest-security).
+  async function changePassword() {
+    if (!pwChangeValid) return
+    setPwBusy(true)
+    const { error: reauthErr } = await supabase.auth.signInWithPassword({ email: user.email, password: curPw })
+    if (reauthErr) {
+      setPwBusy(false)
+      setToast('הסיסמה הנוכחית שגויה')
+      setTimeout(() => setToast(''), 2500)
+      return
+    }
+    const { error } = await supabase.auth.updateUser({ password: newPw })
+    setPwBusy(false)
+    setToast(error ? 'עדכון הסיסמה נכשל' : 'הסיסמה עודכנה ✓')
+    if (!error) { setCurPw(''); setNewPw('') }
+    setTimeout(() => setToast(''), 2500)
+  }
+
+  // Prepared button — the real reset-link flow (send email → reset-password page)
+  // is not built yet. Shares the same infra gap as Login's forgot-password stub.
+  function forgotPassword() {
+    setToast('שחזור סיסמה — בקרוב')
+    setTimeout(() => setToast(''), 2500)
   }
 
   async function signOut() {
@@ -214,6 +214,9 @@ export default function Profile() {
   }
 
   // ── GDPR self-service ──
+  // Mobile-first export: the native share sheet lets the user send the JSON to
+  // themselves (Mail / WhatsApp / save to Files). Falls back to a direct
+  // download on desktop, where a browser download is reliable.
   async function exportData() {
     setBusy(true)
     try {
@@ -225,14 +228,21 @@ export default function Profile() {
       })
       if (!res.ok) throw new Error()
       const data = await res.json()
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-      const url  = URL.createObjectURL(blob)
-      const a    = document.createElement('a')
-      a.href = url
-      a.download = `matkon-data-${new Date().toISOString().slice(0,10)}.json`
-      a.click()
-      URL.revokeObjectURL(url)
-    } catch {
+      const filename = `matkon-data-${new Date().toISOString().slice(0,10)}.json`
+      const file = new File([JSON.stringify(data, null, 2)], filename, { type: 'application/json' })
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'הנתונים שלי ב-MATKON' })
+      } else {
+        const url = URL.createObjectURL(file)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        a.click()
+        URL.revokeObjectURL(url)
+      }
+    } catch (e) {
+      if (e?.name === 'AbortError') return  // user dismissed the share sheet
       setToast('שגיאה בייצוא הנתונים')
       setTimeout(() => setToast(''), 2500)
     } finally {
@@ -266,38 +276,36 @@ export default function Profile() {
     </div>
   )
 
-  const fullName  = profile?.full_name || 'משתמש'
+  const activeProfile = profile
+  const fullName  = activeProfile?.full_name || 'משתמש'
   const firstName = fullName.split(' ')[0] || 'משתמש'
-  const country   = profile?.country  || ''
+  const country   = activeProfile?.country  || ''
   const flag      = countryFlag(country)
+  const currentEmail = user?.email || ''
+
+  const emailChangeValid = /\S+@\S+\.\S+/.test(newEmail) &&
+    newEmail.trim().toLowerCase() !== currentEmail.toLowerCase()
+  const pwChangeValid = curPw.length > 0 && passwordValid(newPw)
+  const busyAny = busy || savingProfile || emailBusy || pwBusy
 
   return (
-    <div className="profile-page">
-      <div className="profile-header">
-        <button
-          onClick={signOut}
-          style={{ position:'absolute', top:16, left:16, background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', gap:4, fontSize:'.85rem' }}
-        >
-          <IconLogout size={16} /> יציאה
-        </button>
+    <div className="profile-page page-with-nav">
+      <AppHeader />
 
-        <div className="profile-flags" aria-hidden="true">
-          <span className="profile-flag">🇮🇱</span>
-          {flag && flag !== '🇮🇱' && <span className="profile-flag">{flag}</span>}
+      <div className="profile-header">
+        <div className="profile-id">
+          <span className="profile-flags" dir="ltr" aria-hidden="true">
+            <span>🇮🇱</span>{flag && flag !== '🇮🇱' && <span>{flag}</span>}
+          </span>
+          <span className="profile-name">{firstName}</span>
         </div>
-        <div className="profile-name">{firstName}</div>
-        {country && (
-          <div className="profile-location">{country}</div>
-        )}
-        {profile?.bio && (
-          <div style={{ fontSize: '.85rem', color: 'var(--text-muted)', marginTop: 6, textAlign: 'center', maxWidth: 260 }}>
-            {profile.bio}
-          </div>
+        {activeProfile?.bio && (
+          <div className="profile-bio">{activeProfile.bio}</div>
         )}
         <button
-          className="btn btn-ghost btn-sm"
-          style={{ width:'auto', marginTop:8 }}
-          onClick={() => setEditOpen(true)}
+          className="btn btn-glossy btn-glossy-blue btn-sm"
+          style={{ width:'auto', marginTop:8, display:'inline-flex', alignItems:'center', gap:6 }}
+          onClick={openEdit}
         >
           <IconEdit size={14} /> עריכת פרופיל
         </button>
@@ -305,7 +313,7 @@ export default function Profile() {
         <div className="profile-stats">
           {[
             { val: recipes.length,                           lbl: 'מתכונים' },
-            { val: recipes.filter(r => r.is_public).length, lbl: 'ציבוריים' },
+            { val: recipes.filter(r => r.is_public).length, lbl: 'משותפים' },
             { val: likesCount,                               lbl: 'לייקים'  },
             { val: savedCount,                               lbl: 'שמורים'  },
           ].map(s => (
@@ -338,7 +346,7 @@ export default function Profile() {
         )}
 
         {tab === 'mine' && recipes.map(r => (
-          <ProfileRecipeItem key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`)} />
+          <RecipeCard key={r.id} recipe={r} visibility onClick={() => navigate(`/recipe/${r.id}`)} />
         ))}
 
         {tab === 'saved' && savedLoading && (
@@ -353,25 +361,76 @@ export default function Profile() {
         )}
 
         {tab === 'saved' && saved.map(r => (
-          <ProfileRecipeItem key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`)} />
+          <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`)} />
         ))}
-
-        <button
-          onClick={() => { setPrivacyOpen(true); setConfirmText('') }}
-          style={{ width:'100%', marginTop:24, background:'none', border:'none', color:'var(--text-muted)', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6, fontSize:'.85rem' }}
-        >
-          <IconLock size={15} /> פרטיות ונתונים
-        </button>
       </div>
 
-      {privacyOpen && (
-        <div className="drawer-overlay" onClick={() => !busy && setPrivacyOpen(false)}>
+      {editOpen && (
+        <div className="drawer-overlay" onClick={() => !busyAny && setEditOpen(false)}>
           <div className="drawer" onClick={e => e.stopPropagation()} style={{ maxHeight:'90vh', overflowY:'auto' }}>
             <div className="drawer-header">
-              <span className="drawer-title">פרטיות ונתונים</span>
-              <button className="btn-icon" onClick={() => !busy && setPrivacyOpen(false)}><IconX size={18} /></button>
+              <span className="drawer-title">עריכת פרופיל</span>
+              <button className="btn-icon" onClick={() => !busyAny && setEditOpen(false)}><IconX size={18} /></button>
             </div>
-            <div className="drawer-body" style={{ display:'flex', flexDirection:'column', gap:16 }}>
+            <div className="drawer-body" style={{ display:'flex', flexDirection:'column', gap:16, paddingBottom:'calc(var(--nav-h) + 24px)' }}>
+
+              {/* ── פרטים אישיים (shared with Register) ── */}
+              <NameFields
+                firstName={editForm.firstName}
+                lastName={editForm.lastName}
+                onFirst={v => setEditForm(f => ({ ...f, firstName: v }))}
+                onLast={v => setEditForm(f => ({ ...f, lastName: v }))}
+              />
+
+              <div className="auth-field">
+                <label className="auth-label">מדינת מגורים</label>
+                <CountrySelect value={editForm.country} onChange={v => setEditForm(f => ({ ...f, country: v }))} />
+              </div>
+
+              <div className="auth-field">
+                <label className="auth-label">משפט קצר עליי</label>
+                <textarea className="input" value={editForm.bio} onChange={e => setEditForm(f => ({ ...f, bio: e.target.value }))} placeholder="ספרו קצת על עצמכם..." rows={3} style={{ resize:'none' }} />
+              </div>
+
+              <button className="btn btn-glossy btn-glossy-green" onClick={saveProfile} disabled={savingProfile || !editForm.firstName.trim()}>
+                {savingProfile ? 'שומרים...' : 'שמירת שינויים'}
+              </button>
+
+              {/* ── חשבון וכניסה ── */}
+              <div className="divider" style={{ margin:'8px 0 0' }} />
+              <div className="edit-section-title"><IconKey size={15} /> חשבון וכניסה</div>
+
+              <div className="auth-field">
+                <label className="auth-label">החלפת Email</label>
+                {currentEmail && <div className="edit-current-hint">הנוכחי: {currentEmail}</div>}
+                <input className="input" type="email" placeholder="כתובת Email חדשה" value={newEmail} onChange={e => setNewEmail(e.target.value)} autoComplete="off" />
+                <button className="btn btn-ghost btn-sm" style={{ width:'100%', marginTop:8 }} onClick={changeEmail} disabled={!emailChangeValid || emailBusy}>
+                  {emailBusy ? 'שולחים...' : 'עדכון Email'}
+                </button>
+                <div className="edit-current-hint" style={{ marginTop:6, marginBottom:0 }}>
+                  נשלח לינק אישור לכתובת החדשה (כמו ברישום). ההחלפה תושלם רק אחרי לחיצה עליו — כך מוודאים שהכתובת אמיתית ושלכם.
+                </div>
+              </div>
+
+              <div className="auth-field">
+                <label className="auth-label">החלפת סיסמה</label>
+                <PasswordInput value={curPw} onChange={setCurPw} placeholder="סיסמה נוכחית" autoComplete="current-password" />
+                <div style={{ height:8 }} />
+                <PasswordInput value={newPw} onChange={setNewPw} placeholder="סיסמה חדשה" showRules />
+                <button className="btn btn-ghost btn-sm" style={{ width:'100%', marginTop:8 }} onClick={changePassword} disabled={!pwChangeValid || pwBusy}>
+                  {pwBusy ? 'מעדכנים...' : 'עדכון סיסמה'}
+                </button>
+                {/* Recovery for users who forgot their current password. Button is
+                    ready; the reset-link flow (shared with Login's forgot-password
+                    stub) still needs infrastructure — TODO. */}
+                <button type="button" className="edit-forgot-link" onClick={forgotPassword}>
+                  שכחתם את הסיסמה הנוכחית?
+                </button>
+              </div>
+
+              {/* ── פרטיות ונתונים ── */}
+              <div className="divider" style={{ margin:'8px 0 0' }} />
+              <div className="edit-section-title"><IconLock size={15} color="#a78bff" /> פרטיות ונתונים</div>
 
               {showPasskeys && (
                 <PasskeySection
@@ -387,11 +446,11 @@ export default function Profile() {
                   <IconDownload size={20} style={{ color:'var(--text-muted)' }} />
                   <div style={{ flex:1 }}>
                     <div style={{ fontWeight:600, fontSize:'.95rem' }}>ייצוא הנתונים שלי</div>
-                    <div style={{ fontSize:'.78rem', color:'var(--text-muted)' }}>הורדת כל המתכונים והפרטים כקובץ</div>
+                    <div style={{ fontSize:'.78rem', color:'var(--text-muted)' }}>כל המתכונים והפרטים יישלחו ל-Email שלכם</div>
                   </div>
                 </div>
-                <button className="btn btn-ghost btn-sm" style={{ width:'100%' }} onClick={exportData} disabled={busy}>
-                  {busy ? 'מעבד...' : 'הורדת קובץ נתונים'}
+                <button className="btn btn-ghost btn-sm" style={{ width:'100%' }} onClick={exportData} disabled>
+                  ייצוא הנתונים · בקרוב
                 </button>
               </div>
 
@@ -417,8 +476,8 @@ export default function Profile() {
                   style={{ marginBottom:10 }}
                 />
                 <button
-                  className="btn btn-sm"
-                  style={{ width:'100%', borderColor:'var(--red)', color:'var(--red)', opacity: confirmText==='מחיקה' && !busy ? 1 : .5 }}
+                  className="btn btn-glossy btn-glossy-red btn-sm"
+                  style={{ width:'100%' }}
                   onClick={deleteAccount}
                   disabled={confirmText!=='מחיקה' || busy}
                 >
@@ -426,17 +485,13 @@ export default function Profile() {
                 </button>
               </div>
 
+              <button className="btn btn-ghost btn-sm" style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }} onClick={signOut}>
+                <IconLogout size={16} /> יציאה מהחשבון
+              </button>
+
             </div>
           </div>
         </div>
-      )}
-
-      {editOpen && (
-        <EditModal
-          profile={profile}
-          onClose={() => setEditOpen(false)}
-          onSave={saveProfile}
-        />
       )}
 
       {toast && <div className="toast">{toast}</div>}

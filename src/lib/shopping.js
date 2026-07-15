@@ -172,6 +172,13 @@ export function toggleShoppingItem(id) {
   return items
 }
 
+// Select/deselect every active item at once (the "סימון הכל" control).
+export function setAllShoppingChecked(checked) {
+  const items = load().map(i => ({ ...i, checked }))
+  save(items)
+  return items
+}
+
 // Brief §249: checked items move to the deleted library — not purged.
 // They can be restored or kept forever; the active list stays clean.
 export function moveCheckedToDeleted() {

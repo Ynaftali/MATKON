@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { COUNTRIES } from '../lib/mock'
 import { supabase } from '../lib/supabase'
@@ -11,17 +11,58 @@ import AppHeader from '../components/AppHeader'
 
 export default function Register() {
   const navigate = useNavigate()
-  const [form, setForm]   = useState({ firstName: '', lastName: '', email: '', emailConfirm: '', password: '', country: '' })
+  const [form, setForm]   = useState({ inviteCode: '', firstName: '', lastName: '', email: '', emailConfirm: '', password: '', country: '' })
   const [tosAgreed, setTosAgreed] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  // Invite gate (closed launch): the verdict is stored against the code it was
+  // for, so it's only "valid" while it still matches the current input.
+  const [codeCheck, setCodeCheck] = useState({ code: '', valid: false })
+  // Whether the gate is on. Fail-safe: assume ON until the server says otherwise,
+  // so a failed status read never opens signups. Flipped by app_config.invite_only.
+  const [inviteOnly, setInviteOnly] = useState(true)
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
+
+  const inviteCode   = form.inviteCode.trim().toUpperCase()
+  const codeValid    = inviteCode.length >= 4 && codeCheck.code === inviteCode ? codeCheck.valid : null
+  const gateActive   = inviteOnly
+  // The rest of the form appears only once the code checks out (or the gate is off),
+  // so a mistyped code is caught before the user fills anything else.
+  const formUnlocked = !gateActive || codeValid === true
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/invite-status')
+      .then(r => r.json())
+      .then(d => { if (!cancelled) setInviteOnly(d.inviteOnly !== false) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  // Debounced, non-burning pre-check so a mistyped code is caught before submit.
+  // The real single-use gate is enforced in the DB (handle_new_user).
+  useEffect(() => {
+    if (!gateActive || inviteCode.length < 4) return
+    let cancelled = false
+    const t = setTimeout(async () => {
+      try {
+        const resp = await fetch('/api/check-invite', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ code: inviteCode }),
+        })
+        const body = await resp.json().catch(() => ({}))
+        if (!cancelled) setCodeCheck({ code: inviteCode, valid: !!body.valid })
+      } catch { /* leave the previous verdict; submit is still DB-gated */ }
+    }, 450)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [gateActive, inviteCode])
 
   const allRulesPass   = passwordValid(form.password)
   const emailsMatch    = form.emailConfirm ? form.email.trim().toLowerCase() === form.emailConfirm.trim().toLowerCase() : null
   const countryValid   = COUNTRIES.includes(form.country)
   const namesFilled    = form.firstName.trim() && form.lastName.trim()
-  const canSubmit      = namesFilled && allRulesPass && emailsMatch && countryValid && tosAgreed && !loading
+  const canSubmit      = (!gateActive || codeValid === true) && namesFilled && allRulesPass && emailsMatch && countryValid && tosAgreed && !loading
 
   const submit = async e => {
     e.preventDefault()
@@ -37,11 +78,25 @@ export default function Register() {
           full_name:       `${form.firstName} ${form.lastName}`,
           country:         form.country,
           tos_accepted_at: new Date().toISOString(),
+          invite_code:     inviteCode,
         }
       }
     })
 
-    if (error) { setError(error.message); setLoading(false); return }
+    if (error) {
+      // handle_new_user() aborts the signup with a DB error when the code was
+      // used in the race between our pre-check and here. Surface that clearly
+      // rather than as a generic failure.
+      const isInviteFailure = /database error|invite/i.test(error.message || '')
+      if (isInviteFailure) {
+        setCodeCheck({ code: inviteCode, valid: false })
+        setError('קוד ההזמנה שגוי או שכבר נוצל. בדקו את הקוד ונסו שוב.')
+      } else {
+        setError(error.message)
+      }
+      setLoading(false)
+      return
+    }
 
     // The handle_new_user trigger already creates the public.users row from the
     // signUp metadata (full_name, country). No client-side upsert needed — and the
@@ -68,6 +123,26 @@ export default function Register() {
       <AppHeader title="הצטרפות לקהילה" />
 
       <form className="auth-form" onSubmit={submit}>
+        {gateActive && (
+        <div className="auth-field">
+          <label className="auth-label">קוד הזמנה</label>
+          <input
+            className="input"
+            type="text"
+            placeholder="הקוד שקיבלתם, למשל A7K9-Q4MP"
+            value={form.inviteCode}
+            onChange={set('inviteCode')}
+            required
+            autoComplete="off"
+            autoCapitalize="characters"
+            style={{ textTransform: 'uppercase' }}
+          />
+          {codeValid === true && <div className="pw-match ok">✓ קוד הזמנה תקין</div>}
+          {codeValid === false && <div className="pw-match err">✗ קוד לא תקין או שכבר נוצל</div>}
+        </div>
+        )}
+
+        {formUnlocked && (<>
         <NameFields
           firstName={form.firstName}
           lastName={form.lastName}
@@ -122,6 +197,7 @@ export default function Register() {
         <button className="btn btn-glossy btn-glossy-blue" type="submit" disabled={!canSubmit}>
           {loading ? 'יוצר חשבון...' : 'הרשמה למטבח'}
         </button>
+        </>)}
 
         <div className="auth-divider">או הירשמו עם</div>
 

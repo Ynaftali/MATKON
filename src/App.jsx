@@ -16,6 +16,21 @@ function BanGuard() {
   return null
 }
 
+// Auth gate (product decision 10.7 — "model B"): an unregistered visitor may only
+// reach Splash, Peek, the auth flow, a shared recipe link (view-only), and the
+// legal/blocked pages. EVERY other route bounces to Splash — including manual URL
+// entry. This is a UX/navigation gate; the real data protection is server-side
+// (RLS + authenticated API endpoints). Waits for auth to resolve to avoid a flash.
+function RequireAuth({ children }) {
+  const { user, profile, loading } = useAuth()
+  if (loading) return null
+  if (!user) return <Navigate to="/" replace />
+  // Invite gate (closed launch): an un-redeemed OAuth account must finish
+  // onboarding at /sso (redeem a code) before it can reach any app route.
+  if (profile && !profile.invite_redeemed_at) return <Navigate to="/sso" replace />
+  return children
+}
+
 // Landing point after an OAuth (Google/Apple) redirect. Routes a brand-new user
 // through onboarding (country + ToS), and a returning user straight to the feed.
 function AuthCallback() {
@@ -27,10 +42,12 @@ function AuthCallback() {
       done = true
       const { data } = await supabase
         .from('users')
-        .select('country, tos_accepted_at, bio')
+        .select('country, tos_accepted_at, bio, invite_redeemed_at')
         .eq('id', user.id)
         .maybeSingle()
-      const needsOnboarding = !data?.country || !data?.tos_accepted_at
+      // An OAuth account is created un-redeemed (invite gate) — send it to /sso to
+      // redeem a code, same screen that collects country + ToS.
+      const needsOnboarding = !data?.invite_redeemed_at || !data?.country || !data?.tos_accepted_at
       if (needsOnboarding) { navigate('/sso', { replace: true }); return }
       // Brief §182: first-time-on-this-device users get the optional bio prompt —
       // gated on a fresh account so existing users without a bio aren't nagged.
@@ -70,11 +87,10 @@ import CookingMode     from './pages/CookingMode'
 import AddRecipe       from './pages/AddRecipe'
 import EditRecipe      from './pages/EditRecipe'
 import Profile         from './pages/Profile'
-import MapPage         from './pages/MapPage'
-import Community       from './pages/Community'
 import Recipes         from './pages/Recipes'
 import VerifyEmail     from './pages/VerifyEmail'
 import Terms          from './pages/Terms'
+import Privacy        from './pages/Privacy'
 import Shopping       from './pages/Shopping'
 import Blocked        from './pages/Blocked'
 
@@ -90,19 +106,18 @@ export default function App() {
         <Route path="/login"            element={<Login />}           />
         <Route path="/sso"              element={<SSOCountry />}      />
         <Route path="/complete-profile" element={<CompleteProfile />} />
-        <Route path="/feed"             element={<Feed />}            />
+        <Route path="/feed"             element={<RequireAuth><Feed /></RequireAuth>}        />
         <Route path="/recipe/:id"       element={<RecipePage />}      />
-        <Route path="/cook/:id"         element={<CookingMode />}     />
-        <Route path="/add"              element={<AddRecipe />}        />
-        <Route path="/edit/:id"         element={<EditRecipe />}       />
-        <Route path="/profile"          element={<Profile />}         />
-        <Route path="/map"              element={<MapPage />}         />
-        <Route path="/community/:country" element={<Community />}    />
-        <Route path="/recipes"             element={<Recipes />}      />
+        <Route path="/cook/:id"         element={<RequireAuth><CookingMode /></RequireAuth>} />
+        <Route path="/add"              element={<RequireAuth><AddRecipe /></RequireAuth>}   />
+        <Route path="/edit/:id"         element={<RequireAuth><EditRecipe /></RequireAuth>}  />
+        <Route path="/profile"          element={<RequireAuth><Profile /></RequireAuth>}     />
+        <Route path="/recipes"             element={<RequireAuth><Recipes /></RequireAuth>}  />
         <Route path="/verify-email"        element={<VerifyEmail />}  />
         <Route path="/auth/callback"       element={<AuthCallback />} />
         <Route path="/terms"               element={<Terms />}        />
-        <Route path="/shopping"            element={<Shopping />}     />
+        <Route path="/privacy"             element={<Privacy />}      />
+        <Route path="/shopping"            element={<RequireAuth><Shopping /></RequireAuth>} />
         <Route path="/blocked"             element={<Blocked />}      />
         <Route path="*"                    element={<Navigate to="/" />} />
       </Routes>
