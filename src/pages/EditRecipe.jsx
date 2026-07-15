@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
   IconCamera, IconPlus, IconX, IconTrash,
-  IconAlertTriangle, IconWorld, IconLock,
+  IconAlertTriangle,
 } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
@@ -13,6 +13,7 @@ import AppHeader from '../components/AppHeader'
 import IngredientEditor from '../components/IngredientEditor'
 import StepEditor from '../components/StepEditor'
 import TagInput from '../components/TagInput'
+import VisibilityPicker from '../components/VisibilityPicker'
 
 // Normalize stored ingredients (mock {name_he,quantity} or AI {name,amount}) to one editable shape.
 const normIngredients = arr => (Array.isArray(arr) ? arr : []).map(i => ({
@@ -295,22 +296,7 @@ export default function EditRecipe() {
         {/* Visibility */}
         <div>
           <div className="section-title">מי רואה את המתכון</div>
-          <div className="visibility-opts">
-            <div className={`vis-opt ${isPublic ? 'selected' : ''}`} onClick={() => setIsPublic(true)}>
-              <IconWorld size={22} color="var(--green)" />
-              <div className="vis-opt-text">
-                <div className="vis-opt-title">שיתוף עם הקהילה</div>
-                <div className="vis-opt-desc">כולם יוכלו לראות ולבשל את המתכון שלכם</div>
-              </div>
-            </div>
-            <div className={`vis-opt ${!isPublic ? 'selected' : ''}`} onClick={() => setIsPublic(false)}>
-              <IconLock size={22} color="#a78bff" />
-              <div className="vis-opt-text">
-                <div className="vis-opt-title">שמירה אישית</div>
-                <div className="vis-opt-desc">רק אתם תראו את המתכון</div>
-              </div>
-            </div>
-          </div>
+          <VisibilityPicker isPublic={isPublic} onChange={setIsPublic} />
         </div>
 
         {error && <p style={{ color:'var(--red)', fontSize:'.9rem', textAlign:'center' }}>{error}</p>}

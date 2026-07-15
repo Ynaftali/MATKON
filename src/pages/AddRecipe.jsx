@@ -2,12 +2,13 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
-import { IconChevronRight, IconFlame, IconPencil, IconLink, IconCamera, IconPlus, IconX, IconLock, IconWorld, IconBrandWhatsapp, IconBrandX, IconBrandFacebook, IconCopy, IconCheck, IconShieldX, IconHelpCircle, IconEdit, IconHome } from '@tabler/icons-react'
+import { IconChevronRight, IconFlame, IconPencil, IconLink, IconCamera, IconBrandWhatsapp, IconBrandX, IconBrandFacebook, IconCopy, IconCheck, IconShieldX, IconHelpCircle, IconEdit, IconHome } from '@tabler/icons-react'
 import BottomNav from '../components/BottomNav'
 import AppHeader from '../components/AppHeader'
 import IngredientEditor from '../components/IngredientEditor'
 import StepEditor from '../components/StepEditor'
 import TagInput from '../components/TagInput'
+import VisibilityPicker from '../components/VisibilityPicker'
 import { compressImage } from '../lib/compressImage'
 
 const AI_STEPS = [
@@ -508,22 +509,7 @@ export default function AddRecipe() {
 
           <div>
             <div className="section-title">מי רואה את המתכון</div>
-            <div className="visibility-opts">
-              <div className={`vis-opt ${isPublic ? 'selected' : ''}`} onClick={() => setIsPublic(true)}>
-                <IconWorld size={22} color="var(--green)" />
-                <div className="vis-opt-text">
-                  <div className="vis-opt-title">שיתוף עם הקהילה</div>
-                  <div className="vis-opt-desc">כולם יוכלו לראות ולבשל את המתכון שלכם</div>
-                </div>
-              </div>
-              <div className={`vis-opt ${!isPublic ? 'selected' : ''}`} onClick={() => setIsPublic(false)}>
-                <IconLock size={22} color="#a78bff" />
-                <div className="vis-opt-text">
-                  <div className="vis-opt-title">שמירה אישית</div>
-                  <div className="vis-opt-desc">רק אתם תראו את המתכון</div>
-                </div>
-              </div>
-            </div>
+            <VisibilityPicker isPublic={isPublic} onChange={setIsPublic} />
           </div>
 
           {saveError && <p style={{ color:'var(--red)', fontSize:'.9rem', textAlign:'center' }}>{saveError}</p>}
