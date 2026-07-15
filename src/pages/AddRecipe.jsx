@@ -6,6 +6,7 @@ import { IconChevronRight, IconFlame, IconPencil, IconLink, IconCamera, IconPlus
 import BottomNav from '../components/BottomNav'
 import AppHeader from '../components/AppHeader'
 import IngredientEditor from '../components/IngredientEditor'
+import StepEditor from '../components/StepEditor'
 import { compressImage } from '../lib/compressImage'
 
 const AI_STEPS = [
@@ -289,9 +290,6 @@ export default function AddRecipe() {
 
   // ── Edit the AI-parsed recipe before saving (brief: the user can always edit) ──
   const setField     = (key, val) => setRecipe(r => ({ ...r, [key]: val }))
-  const setStepText  = (idx, val) => setRecipe(r => ({ ...r, steps: (r.steps || []).map((it, i) => i === idx ? { ...it, text: val } : it) }))
-  const addStep      = () => setRecipe(r => ({ ...r, steps: [...(r.steps || []), { text: '', duration_seconds: null }] }))
-  const delStep      = idx => setRecipe(r => ({ ...r, steps: (r.steps || []).filter((_, i) => i !== idx) }))
 
   const shareLink = savedId ? `https://matkon.co/recipe/${savedId}` : 'https://matkon.co'
 
@@ -468,14 +466,10 @@ export default function AddRecipe() {
 
               <div>
                 <div className="section-title" style={{ fontSize:'.85rem', marginBottom:8 }}>שלבי הכנה</div>
-                {(recipe.steps || []).map((st, idx) => (
-                  <div key={idx} style={{ display:'flex', gap:6, alignItems:'flex-start', marginBottom:6 }}>
-                    <span style={{ color:'var(--blue-light)', fontSize:'.85rem', marginTop:11, flexShrink:0, width:16 }}>{idx + 1}.</span>
-                    <textarea className="input" style={{ flex:1, minHeight:44, padding:'8px 10px', resize:'none' }} placeholder={`שלב ${idx + 1}`} value={st.text || ''} onChange={e => setStepText(idx, e.target.value)} />
-                    <button className="btn-icon" style={{ color:'var(--red)', flexShrink:0 }} onClick={() => delStep(idx)} aria-label="הסר שלב"><IconX size={16} /></button>
-                  </div>
-                ))}
-                <button className="btn btn-ghost btn-sm" style={{ width:'auto', padding:'8px 12px', marginTop:4 }} onClick={addStep}><IconPlus size={16} /> הוסף שלב</button>
+                <StepEditor
+                  steps={recipe.steps}
+                  onChange={steps => setRecipe(r => ({ ...r, steps }))}
+                />
               </div>
             </div>
           )}

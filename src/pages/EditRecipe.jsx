@@ -11,6 +11,7 @@ import ImageRejectionModal from '../components/ImageRejectionModal'
 import BottomNav from '../components/BottomNav'
 import AppHeader from '../components/AppHeader'
 import IngredientEditor from '../components/IngredientEditor'
+import StepEditor from '../components/StepEditor'
 
 // Normalize stored ingredients (mock {name_he,quantity} or AI {name,amount}) to one editable shape.
 const normIngredients = arr => (Array.isArray(arr) ? arr : []).map(i => ({
@@ -90,10 +91,6 @@ export default function EditRecipe() {
     setLoading(false)
   }
 
-  // ── step helpers ──
-  const setStepText = (idx, val) => setSteps(arr => arr.map((it, i) => i === idx ? { ...it, text: val } : it))
-  const addStep = () => setSteps(arr => [...arr, { text: '', duration_seconds: null }])
-  const delStep = idx => setSteps(arr => arr.filter((_, i) => i !== idx))
 
   // Pull existing community tags (most-used first) so the input can suggest them —
   // keeps tags consistent instead of "צמחוני"/"צמחונית" duplicates. Mirrors AddRecipe.
@@ -305,14 +302,7 @@ export default function EditRecipe() {
             אם תזינו זמן בשלב הכנה, ניצור טיימר אוטומטי לבישול.<br />
             הימנעו מלחזור על אותו זמן בשלבים עוקבים.
           </p>
-          {steps.map((step, idx) => (
-            <div key={idx} style={{ display:'flex', gap:6, alignItems:'flex-start', marginBottom:6 }}>
-              <span style={{ color:'var(--blue-light)', fontSize:'.85rem', marginTop:11, flexShrink:0, width:16 }}>{idx + 1}.</span>
-              <textarea className="input" style={{ flex:1, minHeight:44, padding:'8px 10px', resize:'none' }} placeholder={`שלב ${idx + 1}`} value={step.text} onChange={e => setStepText(idx, e.target.value)} />
-              <button className="btn-icon" style={{ color:'var(--red)', flexShrink:0 }} onClick={() => delStep(idx)} aria-label="הסר שלב"><IconX size={16} /></button>
-            </div>
-          ))}
-          <button className="btn btn-ghost btn-sm" style={{ width:'auto', padding:'8px 12px', marginTop:4 }} onClick={addStep}><IconPlus size={16} /> הוסף שלב</button>
+          <StepEditor steps={steps} onChange={setSteps} />
         </div>
 
         <div className="divider" />
