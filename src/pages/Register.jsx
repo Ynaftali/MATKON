@@ -32,7 +32,7 @@ export default function Register() {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/invite-status')
+    fetch('/api/invite')
       .then(r => r.json())
       .then(d => { if (!cancelled) setInviteOnly(d.inviteOnly !== false) })
       .catch(() => {})
@@ -46,10 +46,10 @@ export default function Register() {
     let cancelled = false
     const t = setTimeout(async () => {
       try {
-        const resp = await fetch('/api/check-invite', {
+        const resp = await fetch('/api/invite', {
           method:  'POST',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ code: inviteCode }),
+          body:    JSON.stringify({ action: 'check', code: inviteCode }),
         })
         const body = await resp.json().catch(() => ({}))
         if (!cancelled) setCodeCheck({ code: inviteCode, valid: !!body.valid })

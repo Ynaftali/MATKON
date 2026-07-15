@@ -29,7 +29,7 @@ export default function SSOCountry() {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/invite-status')
+    fetch('/api/invite')
       .then(r => r.json())
       .then(d => { if (!cancelled) setInviteOnly(d.inviteOnly !== false) })
       .catch(() => {})
@@ -51,13 +51,13 @@ export default function SSOCountry() {
     // we save the profile — an un-redeemed OAuth account has no app access.
     if (needsCode) {
       const { data: { session } } = await supabase.auth.getSession()
-      const resp = await fetch('/api/redeem-invite', {
+      const resp = await fetch('/api/invite', {
         method:  'POST',
         headers: {
           'Content-Type':  'application/json',
           Authorization:   `Bearer ${session?.access_token || ''}`,
         },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ action: 'redeem', code }),
       })
       const body = await resp.json().catch(() => ({}))
       if (body.banned) { navigate('/blocked', { replace: true }); return }
