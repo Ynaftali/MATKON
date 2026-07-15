@@ -7,6 +7,7 @@ import BottomNav from '../components/BottomNav'
 import AppHeader from '../components/AppHeader'
 import IngredientEditor from '../components/IngredientEditor'
 import StepEditor from '../components/StepEditor'
+import TagInput from '../components/TagInput'
 import { compressImage } from '../lib/compressImage'
 
 const AI_STEPS = [
@@ -85,8 +86,6 @@ export default function AddRecipe() {
   const [aiError, setAiError]     = useState('')
   const [recipe, setRecipe]       = useState(null)
   const [tags, setTags]           = useState([])
-  const [newTag, setNewTag]       = useState('')
-  const [allTags, setAllTags]     = useState([])   // existing community tags, for autocomplete
   const [isPublic, setIsPublic]   = useState(false) // private by default — sharing is an explicit opt-in
   const [copied, setCopied]       = useState(false)
 
@@ -265,28 +264,6 @@ export default function AddRecipe() {
     }
   }
 
-  // Pull existing community tags (most-used first) so the input can suggest them —
-  // keeps tags consistent instead of "צמחוני"/"צמחונית"/"צמכונית" duplicates.
-  useEffect(() => {
-    supabase.from('recipes').select('tags').eq('is_public', true).limit(500).then(({ data }) => {
-      const counts = {}
-      ;(data || []).forEach(r => (r.tags || []).forEach(t => {
-        const k = (t || '').trim()
-        if (k) counts[k] = (counts[k] || 0) + 1
-      }))
-      setAllTags(Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([t]) => t))
-    })
-  }, [])
-
-  function addTag(value) {
-    const v = (value ?? newTag).trim()
-    if (v && !tags.includes(v)) setTags(t => [...t, v])
-    setNewTag('')
-  }
-
-  const tagSuggestions = newTag.trim()
-    ? allTags.filter(t => t.includes(newTag.trim()) && !tags.includes(t)).slice(0, 6)
-    : []
 
   // ── Edit the AI-parsed recipe before saving (brief: the user can always edit) ──
   const setField     = (key, val) => setRecipe(r => ({ ...r, [key]: val }))
@@ -477,24 +454,7 @@ export default function AddRecipe() {
           <div className="divider" />
           <div>
             <div className="section-title">תגיות</div>
-            <div className="tags-wrap" style={{ marginBottom: 12 }}>
-              {tags.map(t => (
-                <span key={t} className="tag tag-green" style={{ cursor:'pointer' }} onClick={() => setTags(arr => arr.filter(x=>x!==t))}>
-                  {t} <IconX size={10} />
-                </span>
-              ))}
-            </div>
-            <div className="tag-add-input">
-              <input className="input" placeholder="הוסיפו תגית..." value={newTag} onChange={e=>setNewTag(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addTag()} style={{height:40,padding:'8px 12px'}} />
-              <button className="btn btn-ghost btn-sm" onClick={() => addTag()} style={{width:'auto',padding:'8px 14px'}}><IconPlus size={16}/></button>
-            </div>
-            {tagSuggestions.length > 0 && (
-              <div className="tag-suggestions">
-                {tagSuggestions.map(t => (
-                  <button key={t} type="button" className="tag-suggestion" onClick={() => addTag(t)}>{t}</button>
-                ))}
-              </div>
-            )}
+            <TagInput tags={tags} onChange={setTags} />
           </div>
 
           <div className="divider" />
