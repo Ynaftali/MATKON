@@ -14,6 +14,18 @@ import UserIdentity from '../components/UserIdentity'
 import BottomNav from '../components/BottomNav'
 import ImageRejectionModal from '../components/ImageRejectionModal'
 
+// A shared recipe link is a capability: if the normal (RLS-guarded) read returns
+// nothing — a community-private recipe opened by someone who isn't the owner — ask
+// the server link-view endpoint, which returns any recipe by its exact id.
+async function fetchSharedRecipe(id) {
+  try {
+    const resp = await fetch(`/api/recipe?id=${encodeURIComponent(id)}`)
+    if (!resp.ok) return null
+    const { recipe } = await resp.json()
+    return recipe || null
+  } catch { return null }
+}
+
 function timeAgo(ts) {
   const diff = Date.now() - new Date(ts).getTime()
   const m = Math.floor(diff / 60000)
@@ -32,6 +44,7 @@ export default function RecipePage() {
 
   const [recipe, setRecipe]       = useState(location.state?.recipe || null)
   const [loading, setLoading]     = useState(!location.state?.recipe)
+  const [notFound, setNotFound]   = useState(false)
   const [servings, setServings]   = useState(4)
   // "המשיכו לבשל" vs "התחילו לבשל": CookingMode persists completed steps in
   // localStorage (matkon_cook_done_<id>). If any step is done, offer to resume.
@@ -94,12 +107,14 @@ export default function RecipePage() {
 
   async function loadRecipe() {
     setLoading(true)
-    // Try Supabase first
-    const { data, error } = await supabase
+    // maybeSingle (not single) so a private/deleted recipe returns null instead
+    // of erroring. For an anon visitor arriving via a shared link, RLS returns 0
+    // rows for a non-public recipe — that's the not-found path below.
+    const { data } = await supabase
       .from('recipes')
       .select('*, users(full_name, country, bio)')
       .eq('id', id)
-      .single()
+      .maybeSingle()
     if (data) {
       setRecipe(data)
       setServings(data.servings || 4)
@@ -110,9 +125,20 @@ export default function RecipePage() {
         setRecipe(mock)
         setServings(mock.servings || 4)
       } else {
-        // Real UUID but not found — go back
-        navigate(-1)
-        return
+        // RLS hid it: a community-private recipe opened via a shared link by
+        // someone who isn't the owner. The link is a capability — try the
+        // server link-view endpoint before treating it as missing.
+        const shared = await fetchSharedRecipe(id)
+        if (shared) {
+          setRecipe(shared)
+          setServings(shared.servings || 4)
+        } else {
+          // Genuinely gone (deleted). NEVER navigate(-1) here: a visitor from an
+          // external link has no history, so it would hang forever on "טוענים".
+          setNotFound(true)
+          setLoading(false)
+          return
+        }
       }
     }
     setLoading(false)
@@ -369,6 +395,22 @@ export default function RecipePage() {
     return m >= 60 ? `${Math.floor(m/60)}ש' ${m%60}ד'` : `${m} דקות`
   }
 
+  if (notFound) return (
+    <div className="page" style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100vh', gap:16, padding:24, textAlign:'center' }}>
+      <div style={{ fontSize:'3rem' }}>🍳</div>
+      <h2 style={{ margin:0 }}>המתכון לא זמין</h2>
+      <p style={{ color:'var(--text-muted)', maxWidth:320, lineHeight:1.5 }}>
+        ייתכן שהמתכון נמחק, או שהוא פרטי ואינו משותף לצפייה.
+      </p>
+      <button
+        className="btn btn-glossy btn-glossy-blue"
+        style={{ width:'auto', padding:'10px 24px' }}
+        onClick={() => navigate(currentUser ? '/feed' : '/')}
+      >
+        {currentUser ? 'לפיד הקהילה' : 'לדף הבית'}
+      </button>
+    </div>
+  )
   if (loading || !recipe) return (
     <div className="page" style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100vh' }}>
       <p style={{ color:'var(--text-muted)' }}>טוענים מתכון...</p>
