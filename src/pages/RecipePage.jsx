@@ -33,6 +33,15 @@ export default function RecipePage() {
   const [recipe, setRecipe]       = useState(location.state?.recipe || null)
   const [loading, setLoading]     = useState(!location.state?.recipe)
   const [servings, setServings]   = useState(4)
+  // "המשיכו לבשל" vs "התחילו לבשל": CookingMode persists completed steps in
+  // localStorage (matkon_cook_done_<id>). If any step is done, offer to resume.
+  // Refreshed on window focus so returning from the cook screen updates the label.
+  const [hasProgress, setHasProgress] = useState(() => {
+    try {
+      const d = JSON.parse(localStorage.getItem(`matkon_cook_done_${id}`) || '[]')
+      return Array.isArray(d) && d.length > 0
+    } catch { return false }
+  })
 
   const [liked, setLiked]             = useState(false)
   const [likeLoading, setLikeLoading] = useState(false)
@@ -60,6 +69,19 @@ export default function RecipePage() {
     const id = setInterval(() => setTick(t => t + 1), 60_000)
     return () => clearInterval(id)
   }, [])
+
+  // Re-read cooking progress when the tab regains focus (e.g. after returning
+  // from CookingMode without a full remount) so the button label stays correct.
+  useEffect(() => {
+    const refresh = () => {
+      try {
+        const d = JSON.parse(localStorage.getItem(`matkon_cook_done_${id}`) || '[]')
+        setHasProgress(Array.isArray(d) && d.length > 0)
+      } catch { /* keep previous */ }
+    }
+    window.addEventListener('focus', refresh)
+    return () => window.removeEventListener('focus', refresh)
+  }, [id])
 
   function showToast(msg) {
     setToast(msg)
@@ -411,11 +433,11 @@ export default function RecipePage() {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
           <div className="rpage-title" style={{ marginBottom: 0 }}>{recipe.title}</div>
           <button
-            className={`btn btn-green${isGuest ? ' gated' : ''}`}
+            className={`btn btn-glossy btn-glossy-green${isGuest ? ' gated' : ''}`}
             style={{ width: 'auto', padding: '10px 20px', fontSize: '.9rem', flexShrink: 0, borderRadius: 24, marginTop: 4 }}
             onClick={() => isGuest ? setGateOpen(true) : navigate(`/cook/${recipe.id}`, { state: { recipe } })}
           >
-            התחילו לבשל
+            {hasProgress ? 'המשיכו לבשל' : 'התחילו לבשל'}
           </button>
         </div>
 

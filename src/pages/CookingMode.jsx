@@ -171,6 +171,9 @@ export default function CookingMode() {
     try { return parseInt(localStorage.getItem(`matkon_cook_step_${id}`) || '0', 10) || 0 }
     catch { return 0 }
   })
+  // Bumped by "התחילו מחדש" to force every StepTimer to remount and re-read its
+  // (now-cleared) localStorage, so a restart also zeroes any running timer.
+  const [resetNonce, setResetNonce] = useState(0)
 
   // Recipe actions in cooking mode — users may want to like/save/share mid-cook.
   const { user: currentUser } = useAuth()
@@ -267,6 +270,19 @@ export default function CookingMode() {
     })
   }
 
+  // "התחילו מחדש": wipe all saved progress for this recipe — completed steps,
+  // active step, and every per-step timer — then remount the timers via resetNonce.
+  function restart() {
+    try {
+      localStorage.removeItem(`matkon_cook_done_${id}`)
+      localStorage.removeItem(`matkon_cook_step_${id}`)
+      steps.forEach((_, i) => localStorage.removeItem(`matkon_timer_${id}_${i}`))
+    } catch {}
+    setDone(new Set())
+    setActiveStep(0)
+    setResetNonce(n => n + 1)
+  }
+
   if (allDone) {
     // Clear saved progress
     try {
@@ -313,7 +329,20 @@ export default function CookingMode() {
         </div>
       </div>
 
-      <div className="cook-title">{recipe.title}</div>
+      {/* Title + restart button — same position/size/glossy style as the
+          start/continue-cooking button on the recipe page (button uniformity). */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, padding: '14px 16px 4px' }}>
+        <div className="cook-title" style={{ padding: 0 }}>{recipe.title}</div>
+        {done.size > 0 && (
+          <button
+            className="btn btn-glossy btn-glossy-green"
+            style={{ width: 'auto', padding: '10px 20px', fontSize: '.9rem', flexShrink: 0, borderRadius: 24, marginTop: 4 }}
+            onClick={restart}
+          >
+            התחילו מחדש
+          </button>
+        )}
+      </div>
 
       {recipe.users && (
         <UserIdentity country={recipe.users.country} fullName={recipe.users.full_name} className="rpage-author-name" style={{ padding: '0 16px 8px' }} />
@@ -347,7 +376,7 @@ export default function CookingMode() {
               <div className="cook-step-text">{text}</div>
               {dur && (
                 <StepTimer
-                  key={`timer-${i}`}
+                  key={`timer-${i}-${resetNonce}`}
                   durationSeconds={dur}
                   storageKey={`matkon_timer_${id}_${i}`}
                 />
