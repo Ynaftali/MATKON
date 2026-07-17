@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase'
 import { compressImage } from '../lib/compressImage'
 import { addIngredientsToList } from '../lib/shopping'
 import { useAuth } from '../lib/AuthContext'
+import UserIdentity from '../components/UserIdentity'
 import BottomNav from '../components/BottomNav'
 import ImageRejectionModal from '../components/ImageRejectionModal'
 
@@ -23,13 +24,6 @@ function timeAgo(ts) {
   return `לפני ${Math.floor(h / 24)} ימים`
 }
 
-// Canonical author display: first name + last-name initial (no city). e.g. "נפתלי כ."
-function authorName(fullName) {
-  const parts = (fullName || '').trim().split(/\s+/).filter(Boolean)
-  if (parts.length === 0) return 'אנונימי'
-  if (parts.length === 1) return parts[0]
-  return `${parts[0]} ${parts[1][0]}.`
-}
 
 export default function RecipePage() {
   const { id }     = useParams()
@@ -428,7 +422,7 @@ export default function RecipePage() {
         {/* Author (per Brief: flags + first name only — no avatar) */}
         <div className="rpage-author">
           <div className="rpage-author-info">
-            <div className="rpage-author-name">{countryFlag(user.country)} 🇮🇱 {authorName(user.full_name)}</div>
+            <UserIdentity country={user.country} fullName={user.full_name} className="rpage-author-name" />
           </div>
         </div>
 

@@ -514,7 +514,7 @@ export default function AddRecipe() {
 
           {saveError && <p style={{ color:'var(--red)', fontSize:'.9rem', textAlign:'center' }}>{saveError}</p>}
 
-          <button className="btn btn-green" onClick={saveRecipe} disabled={saving}>
+          <button className="btn btn-glossy btn-glossy-blue" style={{ marginBottom: 12 }} onClick={saveRecipe} disabled={saving}>
             {saving ? 'שומר...' : 'שמרו את המתכון'}
           </button>
         </div>

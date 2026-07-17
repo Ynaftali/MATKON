@@ -301,7 +301,7 @@ export default function EditRecipe() {
 
         {error && <p style={{ color:'var(--red)', fontSize:'.9rem', textAlign:'center' }}>{error}</p>}
 
-        <button className="btn btn-glossy btn-glossy-green" onClick={save} disabled={saving || !title.trim()}>
+        <button className="btn btn-glossy btn-glossy-blue" style={{ marginBottom: 12 }} onClick={save} disabled={saving || !title.trim()}>
           {saving ? 'שומר...' : 'שמרו שינויים'}
         </button>
 

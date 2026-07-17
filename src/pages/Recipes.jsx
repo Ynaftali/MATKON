@@ -5,6 +5,7 @@ import { useAuth } from '../lib/AuthContext'
 import BottomNav from '../components/BottomNav'
 import AppHeader from '../components/AppHeader'
 import RecipeCard from '../components/RecipeCard'
+import { countryFlag } from '../lib/mock'
 
 const TABS = [
   { id: 'mine',      label: 'המתכונים שלי' },
@@ -240,7 +241,16 @@ export default function Recipes() {
             </div>
             {loading && <p style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>טוענים...</p>}
             {!loading && community.length === 0 && (
-              <EmptyState icon="🌍" text="אין מתכונים עדיין" sub="היו הראשונים לשתף מתכון עם הקהילה" btnText="הוספת מתכון" onBtn={() => navigate('/add')} />
+              <EmptyState
+                icon={communityCountry
+                  ? <span dir="ltr" style={{ display:'inline-flex', gap:6 }}>{countryFlag(communityCountry)}<span>🇮🇱</span></span>
+                  : '🌍'}
+                sub={(communityCountry === null || communityCountry === profile?.country)
+                  ? 'היו הראשונים לשתף מתכון עם הקהילה'
+                  : 'עדיין אין מתכונים מהקהילה הזו'}
+                btnText={(communityCountry === null || communityCountry === profile?.country) ? 'הוספת מתכון' : undefined}
+                onBtn={() => navigate('/add')}
+              />
             )}
             {community.map(r => (
               <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`, { state: { recipe: r } })} />

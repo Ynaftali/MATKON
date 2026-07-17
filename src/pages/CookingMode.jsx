@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { mockRecipes, CATEGORY_GRADIENTS } from '../lib/mock'
 import { useAuth } from '../lib/AuthContext'
 import BottomNav from '../components/BottomNav'
+import UserIdentity from '../components/UserIdentity'
 
 function parseHebrewDuration(text) {
   if (!text) return null
@@ -183,7 +184,7 @@ export default function CookingMode() {
   useEffect(() => {
     if (state?.recipe) return // already have recipe from navigation
     async function load() {
-      const { data } = await supabase.from('recipes').select('*').eq('id', id).single()
+      const { data } = await supabase.from('recipes').select('*, users(full_name, country)').eq('id', id).single()
       setRecipe(data || mockRecipes.find(r => r.id === id) || null)
       setLoading(false)
     }
@@ -313,6 +314,10 @@ export default function CookingMode() {
       </div>
 
       <div className="cook-title">{recipe.title}</div>
+
+      {recipe.users && (
+        <UserIdentity country={recipe.users.country} fullName={recipe.users.full_name} className="rpage-author-name" style={{ padding: '0 16px 8px' }} />
+      )}
 
       <div className="cook-steps">
         {steps.map((step, i) => {

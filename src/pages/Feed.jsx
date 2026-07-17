@@ -7,8 +7,6 @@ import NotificationsBell from '../components/NotificationsBell'
 import AppHeader from '../components/AppHeader'
 import RecipeCard from '../components/RecipeCard'
 
-const FILTERS = ['הכל', 'בשרי', 'טבעוני', 'חלבי', 'ארוחת בוקר', 'קינוחים']
-
 const PAGE_SIZE = 12
 
 export default function Feed() {
@@ -22,6 +20,21 @@ export default function Feed() {
   const [userId, setUserId]     = useState(null)
   const [userReady, setUserReady] = useState(false)
   const sentinelRef = useRef(null)
+  const [allTags, setAllTags] = useState([])
+
+  // Filter chips are the community's real tags (only ones with ≥1 public recipe),
+  // most-used first — no empty hard-coded categories. Tags ARE the categories.
+  useEffect(() => {
+    supabase.from('recipes').select('tags').eq('is_public', true).limit(500).then(({ data }) => {
+      const counts = {}
+      ;(data || []).forEach(r => (r.tags || []).forEach(t => {
+        const k = (t || '').trim()
+        if (k) counts[k] = (counts[k] || 0) + 1
+      }))
+      setAllTags(Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([t]) => t))
+    })
+  }, [])
+  const filters = ['הכל', ...allTags]
 
   // Who's viewing — so we can hide their own recipes from the community feed.
   useEffect(() => {
@@ -49,7 +62,7 @@ export default function Feed() {
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1)
 
-    if (filter !== 'הכל') query = query.eq('category', filter)
+    if (filter !== 'הכל') query = query.contains('tags', [filter])
     if (userId) query = query.neq('user_id', userId)
 
     const { data, error } = await query
@@ -98,7 +111,7 @@ export default function Feed() {
 
   return (
     <div className="feed-page page-with-nav">
-      <AppHeader right={<NotificationsBell />} />
+      <AppHeader showBack={false} right={<NotificationsBell />} />
       <div className="feed-head">
         <div className="search-bar">
           <IconSearch size={18} />
@@ -111,7 +124,7 @@ export default function Feed() {
       </div>
 
       <div className="filter-tabs">
-        {FILTERS.map(f => (
+        {filters.map(f => (
           <button
             key={f}
             className={`filter-tab ${filter === f ? 'active' : ''}`}
