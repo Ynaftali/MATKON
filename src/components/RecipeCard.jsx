@@ -17,6 +17,13 @@ export default function RecipeCard({ recipe, onClick, showAuthor = true, visibil
 
   return (
     <div className="rcard" style={bgStyle} onClick={onClick}>
+      {recipe.tags?.length > 0 && (
+        <div className="rcard-tags">
+          {recipe.tags.slice(0, 2).map((t, i) => (
+            <span key={i} className="rcard-tag">{t}</span>
+          ))}
+        </div>
+      )}
       <div className="rcard-overlay">
         <div className="rcard-title">{recipe.title}</div>
         <div className="rcard-meta">

@@ -425,6 +425,10 @@ p  { line-height: 1.6; }
   display: flex; flex-direction: column; justify-content: flex-end; padding: 16px; gap: 6px;
 }
 .rcard-cat { align-self: flex-start; }
+/* Tags floating on the card image (E6) — dark translucent pill for legibility
+   over any photo. Up to 2 tags, top corner, out of the way of the title. */
+.rcard-tags { position: absolute; top: 10px; right: 10px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 72%; z-index: 2; }
+.rcard-tag  { background: rgba(8,13,28,.62); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); color: #fff; padding: 4px 12px; border-radius: 20px; font-size: .75rem; font-weight: 600; white-space: nowrap; }
 .rcard-title { font-size: 1.25rem; font-weight: 800; line-height: 1.25; }
 .rcard-meta { display: flex; align-items: center; justify-content: space-between; }
 .rcard-author { display: flex; align-items: center; gap: 6px; font-size: .82rem; color: var(--text-2); }
