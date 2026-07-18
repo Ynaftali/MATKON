@@ -11,6 +11,7 @@ import { compressImage } from '../lib/compressImage'
 import { addIngredientsToList } from '../lib/shopping'
 import { useAuth } from '../lib/AuthContext'
 import { setReturnTo } from '../lib/returnTo'
+import AiImageBadge from '../components/AiImageBadge'
 import UserIdentity from '../components/UserIdentity'
 import BottomNav from '../components/BottomNav'
 import ImageRejectionModal from '../components/ImageRejectionModal'
@@ -436,6 +437,7 @@ export default function RecipePage() {
           />
         )}
         <div className="rpage-hero-overlay" />
+        <AiImageBadge imageUrl={recipe.image_url} />
         <div className="rpage-hero-top">
           <button className="btn-icon" onClick={() => navigate(-1)}>
             <IconChevronRight size={20} />
