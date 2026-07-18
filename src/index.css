@@ -450,13 +450,23 @@ p  { line-height: 1.6; }
    if you are not. No plate or border — a filled pill reads as a label and pulls
    the eye straight off the food. The shadow, not a background, is what keeps it
    readable when the photo underneath is bright. */
+/* Deliberately faint: this is a policy disclosure, not a design element. It has
+   to be findable by a reader who looks for it, and invisible to one who does not.
+   `opacity` compounds with the colour alpha, landing at .20 effective white.
+   The owner picked this level from a 1:1 comparison of .36 / .28 / .20, having
+   been told that too faint a mark stops functioning as a disclosure. Do not
+   lower it further without revisiting that question.
+   It stays legible at all only because the hero gradient lays a near-opaque dark
+   band under it at this height, so it never sits on the food itself. Any change
+   to .rpage-hero-overlay must be re-checked against a bright photo. */
 .ai-watermark {
   position: absolute; bottom: 30px; inset-inline-start: 14px;
   display: inline-flex; align-items: center; gap: 3px;
-  font-size: .58rem; font-weight: 500; letter-spacing: .09em; line-height: 1;
+  font-size: .5rem; font-weight: 500; letter-spacing: .04em; line-height: 1;
   white-space: nowrap;
   color: rgba(255,255,255,.5);
   text-shadow: 0 1px 3px rgba(0,0,0,.55);
+  opacity: .4;
   pointer-events: none;
 }
 .ai-watermark svg { opacity: .85; filter: drop-shadow(0 1px 2px rgba(0,0,0,.55)); }

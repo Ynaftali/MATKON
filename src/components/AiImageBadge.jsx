@@ -28,8 +28,8 @@ export default function AiImageBadge({ imageUrl }) {
   // icon and the words reorder.
   return (
     <div className="ai-watermark" dir="ltr">
-      <IconSparkles size={11} stroke={2} />
-      <span>MADE WITH AI</span>
+      <IconSparkles size={9} stroke={2} />
+      <span>Made with AI</span>
     </div>
   )
 }
