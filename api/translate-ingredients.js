@@ -71,7 +71,7 @@ Return ONLY a valid JSON array:
 
 Rules:
 - index matches the position in the input array.
-- category: ONE of dairy, produce_veg, produce_fruit, meat_fish, spices, pantry, bakery, frozen, other. Eggs → meat_fish (protein aisle). Salt/sugar/oil → pantry. Fresh herbs → produce_veg. Dried herbs → spices.
+- category: ONE of dairy, produce_veg, produce_fruit, meat_fish, spices, pantry, bakery, frozen, other. Eggs → other (they are pareve: neither meat nor dairy). Salt/sugar/oil → pantry. Fresh herbs → produce_veg. Dried herbs → spices.
 - where_to_buy: null if easily found in regular supermarkets. Non-null only for specialty/rare items (do NOT flag staples like flour, sugar, eggs, butter).`
 
   const ingredientList = ingredients.map((ing, i) => {

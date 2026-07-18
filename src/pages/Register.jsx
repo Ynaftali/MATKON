@@ -21,6 +21,11 @@ export default function Register() {
   // Whether the gate is on. Fail-safe: assume ON until the server says otherwise,
   // so a failed status read never opens signups. Flipped by app_config.invite_only.
   const [inviteOnly, setInviteOnly] = useState(true)
+  // Has the server answered yet? Without this the fail-safe default above is
+  // rendered as fact for ~half a second: the invite field paints, the rest of the
+  // form stays locked, and both flip once the real answer lands. Holding the form
+  // back until the verdict is in keeps the fail-safe without showing the wrong UI.
+  const [gateResolved, setGateResolved] = useState(false)
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }))
 
   const inviteCode   = form.inviteCode.trim().toUpperCase()
@@ -35,7 +40,11 @@ export default function Register() {
     fetch('/api/invite')
       .then(r => r.json())
       .then(d => { if (!cancelled) setInviteOnly(d.inviteOnly !== false) })
+      // Swallow: a failed read leaves inviteOnly at its fail-safe true.
       .catch(() => {})
+      // Resolved either way — on failure we commit to the closed gate rather than
+      // leaving the user on a spinner forever.
+      .finally(() => { if (!cancelled) setGateResolved(true) })
     return () => { cancelled = true }
   }, [])
 
@@ -123,7 +132,11 @@ export default function Register() {
       <AppHeader title="הצטרפות לקהילה" />
 
       <form className="auth-form" onSubmit={submit}>
-        {gateActive && (
+        {!gateResolved && (
+          <p style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>טוענים...</p>
+        )}
+
+        {gateResolved && gateActive && (
         <div className="auth-field">
           <label className="auth-label">קוד הזמנה</label>
           <input
@@ -142,7 +155,7 @@ export default function Register() {
         </div>
         )}
 
-        {formUnlocked && (<>
+        {gateResolved && formUnlocked && (<>
         <NameFields
           firstName={form.firstName}
           lastName={form.lastName}

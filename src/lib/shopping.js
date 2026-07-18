@@ -52,7 +52,12 @@ const KEYWORD_CATEGORY = [
   ['פסטרמ',  'meat_fish'], ['שניצל',   'meat_fish'], ['כבד',    'meat_fish'],
   ['דג',     'meat_fish'], ['סלמון',   'meat_fish'], ['טונה',   'meat_fish'],
   ['קרפיון', 'meat_fish'], ['מושט',    'meat_fish'], ['סרדינ',  'meat_fish'],
-  ['ביצ',    'meat_fish'], // eggs grouped with proteins by convention
+  // Eggs are pareve: filing them under meat/fish (or dairy) is wrong in a Hebrew
+  // kosher-aware app. They don't warrant a category of their own either — a
+  // heading with one item under it is noise — so they go to the catch-all.
+  // Keep this in sync with the category rule in api/translate-ingredients.js,
+  // whose AI-assigned category overwrites this one during enrichment.
+  ['ביצ',    'other'],
 
   // ── fruits ──
   ['תפוח עץ','produce_fruit'], ['תפוז',  'produce_fruit'], ['בננה',   'produce_fruit'],
@@ -106,6 +111,52 @@ export function categorizeIngredient(name) {
   return 'other'
 }
 
+// Hebrew final forms — ם ן ץ ף ך are the same letters as מ נ צ פ כ, so "לחם" and
+// "לחמים" must fold to the same stem.
+const FINAL_FORMS = { 'ם': 'מ', 'ן': 'נ', 'ץ': 'צ', 'ף': 'פ', 'ך': 'כ' }
+// Feminine singular/plural share a stem (עגבני+ה / עגבני+ות) and masculine plural
+// is stem+ים (בצל+ים). Stripping any one of these yields the shared stem.
+const PLURAL_SUFFIXES = ['ות', 'ים', 'ה']
+
+// Morphology alone cannot tell a plural from a word that merely ends the same
+// way: חלבה is not the feminine of חלב. These keep their full form so two real,
+// different products never collapse into one line. Extend as cases surface.
+const NEVER_STRIP = new Set(['חלבה'])
+
+// Comparison key for merging list items. Recipes spell the same ingredient many
+// ways ("עגבניה" / "עגבניות" / "עגבנייה"), and matching on the raw string left
+// three separate rows for one product. This folds the spellings; the item keeps
+// whichever name it was first added with, so the user still reads natural text.
+export function normalizeIngredientName(name) {
+  let s = String(name || '').trim().toLowerCase()
+  if (!s) return ''
+  s = s.replace(/[֑-ׇ]/g, '')       // niqqud / cantillation
+  s = s.replace(/["'׳״`]/g, '')                // geresh, gershayim, quotes
+  s = s.replace(/\s+/g, ' ')                   // collapse whitespace
+  s = s.replace(/יי/g, 'י').replace(/וו/g, 'ו') // ktiv male variants
+  // Suffixes must be stripped BEFORE folding final forms: once ם becomes מ, the
+  // plural "ים" reads as "ימ" and stops matching.
+  if (!NEVER_STRIP.has(s)) {
+    for (const suffix of PLURAL_SUFFIXES) {
+      // Guard the stem length, which also protects short words that merely end
+      // in a suffix: "תות" must not be shortened to "ת".
+      if (s.endsWith(suffix) && s.length - suffix.length >= 2) {
+        s = s.slice(0, -suffix.length)
+        break
+      }
+    }
+  }
+  s = s.replace(/[םןץףך]/g, c => FINAL_FORMS[c])
+  return s
+}
+
+// Two entries are the same shopping line only if the ingredient AND the unit
+// agree — 2 קילו עגבניות and 3 עגבניות are genuinely different lines.
+function sameItem(a, name, unit) {
+  return normalizeIngredientName(a.name) === normalizeIngredientName(name)
+    && (a.unit || '').trim() === unit
+}
+
 function load()         { try { return JSON.parse(localStorage.getItem(KEY)         || '[]') } catch { return [] } }
 function loadDeleted()  { try { return JSON.parse(localStorage.getItem(KEY_DELETED) || '[]') } catch { return [] } }
 function save(items)    { localStorage.setItem(KEY,         JSON.stringify(items))  }
@@ -132,7 +183,7 @@ export function addIngredientsToList(ingredients, recipeTitle) {
     // Brief §249: "...אלא אם כן ישחזרו אותו, או יתווסף שוב ממתכון" — if the same
     // item lives in the deleted library, restoring it (rather than creating a
     // duplicate) is the expected behavior.
-    const deletedIdx = deleted.findIndex(d => d.name === name && d.unit === unit)
+    const deletedIdx = deleted.findIndex(d => sameItem(d, name, unit))
     if (deletedIdx >= 0) {
       const restored = deleted.splice(deletedIdx, 1)[0]
       restored.checked = false
@@ -144,7 +195,7 @@ export function addIngredientsToList(ingredients, recipeTitle) {
     }
 
     // Smart merge: same name + same unit → sum quantities
-    const match = existing.find(e => e.name === name && e.unit === unit && !e.checked)
+    const match = existing.find(e => sameItem(e, name, unit) && !e.checked)
     if (match) {
       match.qty = +(match.qty + qty).toFixed(2)
       match.recipes = [...new Set([...(match.recipes || []), recipeTitle].filter(Boolean))]
