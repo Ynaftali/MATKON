@@ -6,6 +6,7 @@ import { armConditionalPasskey } from '../lib/passkeys'
 import SsoButtons from '../components/SsoButtons'
 import PasskeyOfferModal from '../components/PasskeyOfferModal'
 import AppHeader from '../components/AppHeader'
+import { takeReturnTo } from '../lib/returnTo'
 
 const PASSKEY_OFFER_SEEN = 'matkon_passkey_offer_seen'
 
@@ -28,7 +29,7 @@ export default function Login() {
       signal: ctrl.signal,
       onSignedIn: () => {
         localStorage.setItem(PASSKEY_OFFER_SEEN, '1')
-        navigate('/feed')
+        navigate(takeReturnTo())
       },
       onError: () => setError('הכניסה המהירה לא הצליחה. אפשר לנסות שוב או להיכנס עם סיסמה.'),
     })
@@ -75,7 +76,7 @@ export default function Login() {
       if (!keys?.length) { setOffer(true); return }
       localStorage.setItem(PASSKEY_OFFER_SEEN, '1')
     }
-    navigate('/feed')
+    navigate(takeReturnTo())
   }
 
   async function enablePasskey() {
@@ -93,7 +94,7 @@ export default function Login() {
   function dismissOffer() {
     localStorage.setItem(PASSKEY_OFFER_SEEN, '1')
     setOffer(false)
-    navigate('/feed')
+    navigate(takeReturnTo())
   }
 
   return (

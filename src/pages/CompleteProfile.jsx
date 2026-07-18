@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import AppHeader from '../components/AppHeader'
+import { takeReturnTo } from '../lib/returnTo'
 
 export default function CompleteProfile() {
   const navigate = useNavigate()
@@ -32,7 +33,7 @@ export default function CompleteProfile() {
       if (body.banned) { navigate('/blocked'); return }
       if (!resp.ok) { setErr(body.message || 'העדכון נכשל. נסו שוב.'); return }
       localStorage.setItem('matkon_bio_prompt_seen', '1')
-      navigate('/feed')
+      navigate(takeReturnTo())
     } finally {
       setLoading(false)
     }
@@ -42,7 +43,7 @@ export default function CompleteProfile() {
   // only shown on first login. A repeat nag would be hostile.
   function skip() {
     localStorage.setItem('matkon_bio_prompt_seen', '1')
-    navigate('/feed')
+    navigate(takeReturnTo())
   }
 
   return (

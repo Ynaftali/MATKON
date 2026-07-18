@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase'
 import { compressImage } from '../lib/compressImage'
 import { addIngredientsToList } from '../lib/shopping'
 import { useAuth } from '../lib/AuthContext'
+import { setReturnTo } from '../lib/returnTo'
 import UserIdentity from '../components/UserIdentity'
 import BottomNav from '../components/BottomNav'
 import ImageRejectionModal from '../components/ImageRejectionModal'
@@ -264,7 +265,10 @@ export default function RecipePage() {
     if (!currentUser) { setGateOpen(true); return }
     const url = `https://matkon.co/recipe/${id}`
     if (navigator.share) {
-      try { await navigator.share({ title: recipe.title, text: recipe.description, url }); logShare('native') } catch {}
+      // Share the link only. Passing `text` too made WhatsApp print the whole
+      // recipe description into the message body, on top of the link-preview card
+      // that already shows "קיבלת MATKON" + the recipe name (see api/share-preview).
+      try { await navigator.share({ title: recipe.title, url }); logShare('native') } catch {}
     } else {
       await navigator.clipboard.writeText(url)
       logShare('copy')
@@ -652,8 +656,8 @@ export default function RecipePage() {
             <div className="gate-title">רק רגע — צריך חשבון</div>
             <div className="gate-body">כדי לבשל, לשמור מתכונים, להוסיף לרשימת קניות ולהגיב — צריך להצטרף לקהילה. זה בחינם ולוקח דקה.</div>
             <div className="gate-actions">
-              <button className="btn btn-glossy btn-glossy-purple" onClick={() => navigate('/register')}>הרשמה למטבח</button>
-              <span className="gate-login" onClick={() => navigate('/login')}>כבר יש לי חשבון? כניסה</span>
+              <button className="btn btn-glossy btn-glossy-purple" onClick={() => { setReturnTo(`/recipe/${id}`); navigate('/register') }}>הרשמה למטבח</button>
+              <span className="gate-login" onClick={() => { setReturnTo(`/recipe/${id}`); navigate('/login') }}>כבר יש לי חשבון? כניסה</span>
             </div>
           </div>
         </div>
