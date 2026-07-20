@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { IconChevronRight, IconPlayerPlay, IconPlayerPause, IconRotate, IconCheck, IconHeart, IconBookmark, IconShare } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
@@ -70,35 +70,36 @@ function StepTimer({ durationSeconds, storageKey }) {
   function loadState() {
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) || 'null')
-      if (!saved) return { remaining: durationSeconds, running: false, finished: false }
-      if (saved.finished) return { remaining: 0, running: false, finished: true }
+      const now = Date.now()
+      if (!saved) return { remaining: durationSeconds, running: false, finished: false, runningAt: null }
+      if (saved.finished) return { remaining: 0, running: false, finished: true, runningAt: null }
       if (saved.running && saved.runningAt) {
-        const elapsed  = Math.round((Date.now() - saved.runningAt) / 1000)
+        const elapsed  = Math.round((now - saved.runningAt) / 1000)
         const remaining = Math.max(0, (saved.remaining ?? durationSeconds) - elapsed)
-        if (remaining === 0) return { remaining: 0, running: false, finished: true }
-        return { remaining, running: true, finished: false }
+        if (remaining === 0) return { remaining: 0, running: false, finished: true, runningAt: null }
+        return { remaining, running: true, finished: false, runningAt: now - (durationSeconds - remaining) * 1000 }
       }
-      return { remaining: saved.remaining ?? durationSeconds, running: false, finished: false }
+      return { remaining: saved.remaining ?? durationSeconds, running: false, finished: false, runningAt: null }
     } catch {
-      return { remaining: durationSeconds, running: false, finished: false }
+      return { remaining: durationSeconds, running: false, finished: false, runningAt: null }
     }
   }
 
-  const init = loadState()
+  const [init]                    = useState(loadState)
   const [remaining, setRemaining] = useState(init.remaining)
   const [running, setRunning]     = useState(init.running)
   const [finished, setFinished]   = useState(init.finished)
   const intervalRef               = useRef(null)
-  const runningAtRef              = useRef(init.running ? Date.now() - (durationSeconds - init.remaining) * 1000 : null)
+  const runningAtRef              = useRef(init.runningAt)
 
-  function persist(r, run, fin, startAt) {
+  const persist = useCallback((r, run, fin, startAt) => {
     try {
       localStorage.setItem(storageKey, JSON.stringify({
         remaining: r, running: run, finished: fin,
         runningAt: run ? (startAt ?? Date.now()) : null,
       }))
     } catch { /* storage unavailable (e.g. private browsing) — timer still runs in memory */ }
-  }
+  }, [storageKey])
 
   useEffect(() => {
     if (running && remaining > 0) {
@@ -120,7 +121,8 @@ function StepTimer({ durationSeconds, storageKey }) {
       clearInterval(intervalRef.current)
     }
     return () => clearInterval(intervalRef.current)
-  }, [running])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `remaining` is only read to decide whether to (re)start the interval when `running` flips; the tick itself uses the setRemaining functional form, so re-adding this dep would tear the interval down and rebuild it every second
+  }, [running, persist])
 
   function toggleRunning() {
     const nowRunning = !running
@@ -192,15 +194,15 @@ export default function CookingMode() {
       setLoading(false)
     }
     load()
-  }, [id])
+  }, [id, state?.recipe])
 
   // Persist done + activeStep
   useEffect(() => {
     try { localStorage.setItem(`matkon_cook_done_${id}`, JSON.stringify([...done])) } catch { /* storage unavailable */ }
-  }, [done])
+  }, [done, id])
   useEffect(() => {
     try { localStorage.setItem(`matkon_cook_step_${id}`, String(activeStep)) } catch { /* storage unavailable */ }
-  }, [activeStep])
+  }, [activeStep, id])
 
   // Liked/saved state — keyed on user (auth resolves async, after first render).
   useEffect(() => {
