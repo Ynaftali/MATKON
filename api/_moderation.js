@@ -81,6 +81,7 @@ const MODERATION_SYSTEM_TEXT = `אתה מנגנון סינון תוכן (moderat
 - החזר JSON בלבד, ללא טקסט נוסף.`
 
 // ── Field-level sanitizers ──
+// eslint-disable-next-line no-control-regex -- deliberately strips control chars from user input
 const clean    = s => (typeof s === 'string' ? s.replace(/[\x00-\x1F\x7F]/g, '').trim() : '')
 const clampStr = (s, max) => clean(s).slice(0, max)
 const clampInt = (n, max) => { const v = parseInt(n, 10); return Number.isFinite(v) && v >= 0 ? Math.min(v, max) : 0 }

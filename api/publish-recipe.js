@@ -26,6 +26,7 @@ const POLLINATIONS_SAFETY_SUFFIX =
 
 function pollinationsUrl(searchTerm) {
   const term = (typeof searchTerm === 'string' ? searchTerm : '')
+    // eslint-disable-next-line no-control-regex -- deliberately strips control chars from user input
     .replace(/[\x00-\x1F\x7F]/g, '').trim().slice(0, 300) || 'food dish'
   const seed = Math.abs(Array.from(term).reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0))
   const prompt = encodeURIComponent(`${term}, ${POLLINATIONS_SAFETY_SUFFIX}`)

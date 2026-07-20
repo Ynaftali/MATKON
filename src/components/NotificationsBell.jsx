@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { IconBell, IconX, IconTrash, IconHeart, IconBookmark } from '@tabler/icons-react'
+import { IconBell, IconX, IconTrash, IconBookmark } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/AuthContext'
 import { countryFlag } from '../lib/mock'

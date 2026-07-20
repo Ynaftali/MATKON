@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { IconTrash, IconShare, IconCheck, IconShoppingCart, IconArchive, IconArrowBackUp, IconX, IconChevronDown, IconExternalLink } from '@tabler/icons-react'
 import {
   getShoppingList, getDeletedShoppingItems,
   toggleShoppingItem, moveCheckedToDeleted, setAllShoppingChecked,
   restoreDeletedItem, permanentlyDeleteItem, clearDeletedLibrary,
-  updateItemsEnrichment, groupByCategory, SHOPPING_CATEGORIES,
+  updateItemsEnrichment, groupByCategory,
 } from '../lib/shopping'
 import { useAuth } from '../lib/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -33,7 +32,6 @@ export default function Shopping() {
   const [translating, setTranslating] = useState(false)
   const [rareStores, setRareStores] = useState({}) // { [itemId]: { open, loading, stores, error } }
   const { profile } = useAuth()
-  const navigate = useNavigate()
 
   async function toggleRareStores(itemId, ingredientName) {
     const current = rareStores[itemId]

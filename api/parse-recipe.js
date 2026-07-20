@@ -93,7 +93,7 @@ export default async function handler(req, res) {
       { type: 'text', text: 'זהו צילום מסך או תמונה של מתכון. חלץ את המתכון בהתאם להוראות.' },
     ]
   } else if (url) {
-    let pageText = ''
+    let pageText
     try {
       const blocked = ['instagram.com', 'tiktok.com', 'facebook.com']
       if (blocked.some(d => url.includes(d))) {

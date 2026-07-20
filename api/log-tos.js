@@ -24,7 +24,7 @@ export default async function handler(req, res) {
   // Identity resolution: prefer a verified access token. Fall back to a claimed
   // user_id only for fresh signups (email confirmation pending → no session yet);
   // we anti-spoof by requiring the user row to be < 5 minutes old.
-  let userId = null
+  let userId
   const authed = await getUserFromToken(req.headers.authorization)
   if (authed?.id) {
     userId = authed.id

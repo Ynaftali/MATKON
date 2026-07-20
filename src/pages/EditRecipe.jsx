@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
-  IconCamera, IconPlus, IconX, IconTrash,
+  IconCamera, IconTrash,
   IconAlertTriangle,
 } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
