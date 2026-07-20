@@ -155,7 +155,7 @@ export default function EditRecipe() {
       title, description, level,
       prep_time: Number(prepTime) || 0,
       cook_time: Number(cookTime) || 0,
-      servings:  Number(servings) || 2,
+      servings:  Number(servings) || 4,
       ingredients: ingredients.filter(i => i.name.trim()),
       steps:       steps.filter(s => s.text.trim()).map(s => ({ text: s.text, duration_seconds: s.duration_seconds })),
     }
