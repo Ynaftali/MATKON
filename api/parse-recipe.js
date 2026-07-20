@@ -113,7 +113,10 @@ export default async function handler(req, res) {
     let pageText
     try {
       const response = await fetch(url, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Matkonbot/1.0)' },
+        // Some news sites (e.g. Haaretz) block a bot-identifying User-Agent with
+        // 403 but allow an ordinary browser one — verified directly against the
+        // target site, not just through the screen.
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36' },
         signal: AbortSignal.timeout(8000),
       })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
