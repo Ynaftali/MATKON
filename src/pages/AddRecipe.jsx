@@ -423,7 +423,7 @@ export default function AddRecipe() {
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
                 <div><label style={fieldLabel}>זמן הכנה (דק׳)</label><input className="input" type="number" min="0" value={recipe.prep_time ?? 0} onChange={e => setField('prep_time', e.target.value)} /></div>
                 <div><label style={fieldLabel}>זמן בישול (דק׳)</label><input className="input" type="number" min="0" value={recipe.cook_time ?? 0} onChange={e => setField('cook_time', e.target.value)} /></div>
-                <div><label style={fieldLabel}>מנות</label><input className="input" type="number" min="1" value={recipe.servings ?? 2} onChange={e => setField('servings', e.target.value)} /></div>
+                <div><label style={fieldLabel}>מנות</label><input className="input" type="number" min="1" value={recipe.servings ?? 4} onChange={e => setField('servings', e.target.value)} /></div>
                 <div>
                   <label style={fieldLabel}>רמה</label>
                   <select className="input" value={['קל','בינוני','מורכב'].includes(recipe.level) ? recipe.level : 'קל'} onChange={e => setField('level', e.target.value)}>
