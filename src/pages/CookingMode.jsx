@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { IconChevronRight, IconPlayerPlay, IconPlayerPause, IconRotate, IconCheck, IconHeart, IconBookmark, IconShare } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
 import { mockRecipes, CATEGORY_GRADIENTS } from '../lib/mock'
-import { useAuth } from '../lib/AuthContext'
+import { useAuth } from '../lib/useAuth'
 import BottomNav from '../components/BottomNav'
 import UserIdentity from '../components/UserIdentity'
 
@@ -62,7 +62,7 @@ function timerAlarm() {
       osc.start(start); osc.stop(start + 0.3)
     })
   } catch { /* audio unavailable — the visual + vibration still fire */ }
-  try { navigator.vibrate?.([300, 150, 300, 150, 300]) } catch {}
+  try { navigator.vibrate?.([300, 150, 300, 150, 300]) } catch { /* not supported on this device */ }
 }
 
 function StepTimer({ durationSeconds, storageKey }) {
@@ -97,7 +97,7 @@ function StepTimer({ durationSeconds, storageKey }) {
         remaining: r, running: run, finished: fin,
         runningAt: run ? (startAt ?? Date.now()) : null,
       }))
-    } catch {}
+    } catch { /* storage unavailable (e.g. private browsing) — timer still runs in memory */ }
   }
 
   useEffect(() => {
@@ -196,10 +196,10 @@ export default function CookingMode() {
 
   // Persist done + activeStep
   useEffect(() => {
-    try { localStorage.setItem(`matkon_cook_done_${id}`, JSON.stringify([...done])) } catch {}
+    try { localStorage.setItem(`matkon_cook_done_${id}`, JSON.stringify([...done])) } catch { /* storage unavailable */ }
   }, [done])
   useEffect(() => {
-    try { localStorage.setItem(`matkon_cook_step_${id}`, String(activeStep)) } catch {}
+    try { localStorage.setItem(`matkon_cook_step_${id}`, String(activeStep)) } catch { /* storage unavailable */ }
   }, [activeStep])
 
   // Liked/saved state — keyed on user (auth resolves async, after first render).
@@ -239,8 +239,8 @@ export default function CookingMode() {
 
   async function handleShare() {
     const url = `https://matkon.co/recipe/${id}`
-    if (navigator.share) { try { await navigator.share({ title: recipe?.title, url }) } catch {} }
-    else { try { await navigator.clipboard.writeText(url); showToast('הקישור הועתק ✓') } catch {} }
+    if (navigator.share) { try { await navigator.share({ title: recipe?.title, url }) } catch { /* user cancelled the native share sheet */ } }
+    else { try { await navigator.clipboard.writeText(url); showToast('הקישור הועתק ✓') } catch { /* clipboard permission denied */ } }
   }
 
   if (loading) return (
@@ -277,7 +277,7 @@ export default function CookingMode() {
       localStorage.removeItem(`matkon_cook_done_${id}`)
       localStorage.removeItem(`matkon_cook_step_${id}`)
       steps.forEach((_, i) => localStorage.removeItem(`matkon_timer_${id}_${i}`))
-    } catch {}
+    } catch { /* storage unavailable */ }
     setDone(new Set())
     setActiveStep(0)
     setResetNonce(n => n + 1)
@@ -288,7 +288,7 @@ export default function CookingMode() {
     try {
       localStorage.removeItem(`matkon_cook_done_${id}`)
       localStorage.removeItem(`matkon_cook_step_${id}`)
-    } catch {}
+    } catch { /* storage unavailable */ }
     return (
       <div className="cook-page">
         <div className="cook-finish">

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../lib/AuthContext'
+import { useAuth } from '../lib/useAuth'
 import AppHeader from '../components/AppHeader'
 import { takeReturnTo } from '../lib/returnTo'
 

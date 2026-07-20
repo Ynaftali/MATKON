@@ -141,7 +141,7 @@ select version, name from supabase_migrations.schema_migrations order by version
 |---|---|
 | 1 | `grep -rn "TEMP-PREVIEW" src/` ו-`grep -rn "TEMP-COMPARE" src/` חייבים להחזיר 0 |
 | 2 | `npm run build` עובר |
-| 3 | `npx eslint src/ api/` לא חורג מ-**53 בעיות**. כל מספר גבוה יותר הוא רגרסיה שהוספנו |
+| 3 | `npx eslint src/ api/` לא חורג מ-**38 בעיות**. כל מספר גבוה יותר הוא רגרסיה שהוספנו |
 | 4 | commit, ואז `git push origin HEAD:main` (Vercel פורס אוטומטית) |
 | 5 | לאמת שהפריסה במצב READY דרך Vercel |
 

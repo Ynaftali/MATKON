@@ -4,7 +4,7 @@ import { IconEdit, IconLock, IconLogout, IconX, IconDownload, IconTrash, IconKey
 import { countryFlag } from '../lib/mock'
 import { supabase, canUsePasskeys, isPasskeyCancel } from '../lib/supabase'
 import { passwordValid } from '../lib/passwordRules'
-import { useAuth } from '../lib/AuthContext'
+import { useAuth } from '../lib/useAuth'
 import BottomNav from '../components/BottomNav'
 import AppHeader from '../components/AppHeader'
 import RecipeCard from '../components/RecipeCard'

@@ -6,7 +6,7 @@ import {
   restoreDeletedItem, permanentlyDeleteItem, clearDeletedLibrary,
   updateItemsEnrichment, groupByCategory,
 } from '../lib/shopping'
-import { useAuth } from '../lib/AuthContext'
+import { useAuth } from '../lib/useAuth'
 import { supabase } from '../lib/supabase'
 import BottomNav from '../components/BottomNav'
 import AppHeader from '../components/AppHeader'

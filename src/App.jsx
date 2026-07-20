@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import { supabase } from './lib/supabase'
-import { AuthProvider, useAuth } from './lib/AuthContext'
+import { AuthProvider } from './lib/AuthContext'
+import { useAuth } from './lib/useAuth'
 
 // Global guard: a banned user is bounced to /blocked from anywhere in the app.
 function BanGuard() {

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { IconCheck, IconBulb } from '@tabler/icons-react'
 import { COUNTRIES } from '../lib/mock'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../lib/AuthContext'
+import { useAuth } from '../lib/useAuth'
 import CountrySelect from '../components/CountrySelect'
 import AppHeader from '../components/AppHeader'
 

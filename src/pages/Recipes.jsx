@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../lib/AuthContext'
+import { useAuth } from '../lib/useAuth'
 import BottomNav from '../components/BottomNav'
 import AppHeader from '../components/AppHeader'
 import RecipeCard from '../components/RecipeCard'

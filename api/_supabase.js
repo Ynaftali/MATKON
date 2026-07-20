@@ -21,7 +21,7 @@ export async function adminInsert(table, row) {
       headers: { ...adminHeaders(), Prefer: 'return=minimal' },
       body:    JSON.stringify(row),
     })
-  } catch {}
+  } catch { /* fire-and-forget: callers don't await a result, e.g. usage logging */ }
 }
 
 // Call a Postgres function (RPC) with the service role. Throws on failure.
@@ -119,7 +119,7 @@ export async function deleteStoragePrefix(bucket, prefix) {
       headers: adminHeaders(),
       body:    JSON.stringify({ prefixes: paths }),
     })
-  } catch {}
+  } catch { /* best-effort cleanup, never throws into the caller */ }
 }
 
 // Delete specific objects from a storage bucket by full path. Never throws.
@@ -132,7 +132,7 @@ export async function deleteStorageObjects(bucket, paths) {
       headers: adminHeaders(),
       body:    JSON.stringify({ prefixes: paths }),
     })
-  } catch {}
+  } catch { /* best-effort cleanup, never throws into the caller */ }
 }
 
 // Given a Supabase public storage URL, extract the object path within the bucket,

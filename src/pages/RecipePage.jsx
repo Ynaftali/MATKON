@@ -9,7 +9,7 @@ import { mockRecipes, CATEGORY_GRADIENTS, countryFlag } from '../lib/mock'
 import { supabase } from '../lib/supabase'
 import { compressImage } from '../lib/compressImage'
 import { addIngredientsToList } from '../lib/shopping'
-import { useAuth } from '../lib/AuthContext'
+import { useAuth } from '../lib/useAuth'
 import { setReturnTo } from '../lib/returnTo'
 import AiImageBadge from '../components/AiImageBadge'
 import UserIdentity from '../components/UserIdentity'
@@ -269,7 +269,7 @@ export default function RecipePage() {
       // Share the link only. Passing `text` too made WhatsApp print the whole
       // recipe description into the message body, on top of the link-preview card
       // that already shows "קיבלת MATKON" + the recipe name (see api/share-preview).
-      try { await navigator.share({ title: recipe.title, url }); logShare('native') } catch {}
+      try { await navigator.share({ title: recipe.title, url }); logShare('native') } catch { /* user cancelled the native share sheet */ }
     } else {
       await navigator.clipboard.writeText(url)
       logShare('copy')
@@ -299,7 +299,7 @@ export default function RecipePage() {
           const { enriched } = await res.json()
           setShoppingEnriched(enriched)
         }
-      } catch {}
+      } catch { /* translation unavailable — list still opens with the raw ingredients */ }
       setShoppingLoading(false)
     }
   }

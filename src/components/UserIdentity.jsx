@@ -7,7 +7,7 @@ import { countryFlag } from '../lib/mock'
 // (Feed/Recipes cards, RecipePage, CookingMode).
 
 // First name + last-name initial, e.g. "נפתלי כ." — no city.
-export function authorName(fullName) {
+function authorName(fullName) {
   const parts = (fullName || '').trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return 'אנונימי'
   if (parts.length === 1) return parts[0]

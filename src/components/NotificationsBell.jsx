@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { IconBell, IconX, IconTrash, IconBookmark } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../lib/AuthContext'
+import { useAuth } from '../lib/useAuth'
 import { countryFlag } from '../lib/mock'
 
 function timeAgo(ts) {

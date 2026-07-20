@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../lib/AuthContext'
+import { useAuth } from '../lib/useAuth'
 import { IconPencil, IconLink, IconCamera, IconBrandWhatsapp, IconBrandX, IconBrandFacebook, IconCopy, IconCheck, IconShieldX, IconHelpCircle, IconEdit, IconHome } from '@tabler/icons-react'
 import BottomNav from '../components/BottomNav'
 import AppHeader from '../components/AppHeader'

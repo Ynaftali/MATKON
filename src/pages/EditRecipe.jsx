@@ -5,7 +5,7 @@ import {
   IconAlertTriangle,
 } from '@tabler/icons-react'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../lib/AuthContext'
+import { useAuth } from '../lib/useAuth'
 import { compressImage } from '../lib/compressImage'
 import ImageRejectionModal from '../components/ImageRejectionModal'
 import BottomNav from '../components/BottomNav'
