@@ -3,7 +3,23 @@ import { adminSelect } from './_supabase.js'
 export const config = { runtime: 'nodejs' }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const ORIGIN = 'https://www.matkon.co'
+const FALLBACK_ORIGIN = 'https://www.matkon.co'
+
+// Derive the origin from the request so preview deployments point og:url and
+// og:image at themselves — otherwise the image path can't be tested end-to-end
+// off production. The Host header is attacker-controllable, so only trust it for
+// our own domains (matkon.co and Vercel preview hosts); anything else falls back
+// to production, keeping spoofed hosts from redirecting the card elsewhere.
+function originFrom(req) {
+  const host = req.headers['x-forwarded-host'] || req.headers.host || ''
+  const proto = (req.headers['x-forwarded-proto'] || 'https').split(',')[0].trim()
+  const bare = host.split(',')[0].trim().toLowerCase()
+  const nameOnly = bare.split(':')[0]
+  const trusted = nameOnly === 'matkon.co' ||
+    nameOnly.endsWith('.matkon.co') ||
+    nameOnly.endsWith('.vercel.app')
+  return trusted ? `${proto}://${bare}` : FALLBACK_ORIGIN
+}
 
 // Link-preview page for crawlers only (WhatsApp, Telegram, iMessage, Slack…).
 // Those bots do not run JavaScript, so the SPA's index.html would give them an
@@ -19,17 +35,23 @@ function escapeHtml(s) {
 }
 
 export default async function handler(req, res) {
+  const origin = originFrom(req)
   const id = req.query.id
-  if (!UUID.test(id || '')) return res.redirect(302, ORIGIN)
+  if (!UUID.test(id || '')) return res.redirect(302, origin)
 
-  const rows = await adminSelect('recipes', `id=eq.${id}&select=title,image_url`)
+  const rows = await adminSelect('recipes', `id=eq.${id}&select=title,image_url,share_image_url`)
   const recipe = rows[0]
-  if (!recipe) return res.redirect(302, ORIGIN)
+  if (!recipe) return res.redirect(302, origin)
 
-  const pageUrl = `${ORIGIN}/recipe/${id}`
+  const pageUrl = `${origin}/recipe/${id}`
   // The recipe name is user-written text going straight into markup — escape it.
   const title = escapeHtml(recipe.title)
-  const image = recipe.image_url ? `${ORIGIN}/api/og-image?id=${id}` : `${ORIGIN}/logofullbackground.png`
+  // Prebuilt share crop, stored by us — the common case, and what closes the
+  // first-send bug (no live fetch+resize while a messenger waits). /api/og-image
+  // is now only a fallback for a recipe published before this pipeline existed,
+  // until the one-off backfill visits it.
+  const image = recipe.share_image_url ||
+    (recipe.image_url ? `${origin}/api/og-image?id=${id}` : `${origin}/logofullbackground.png`)
 
   const html = `<!doctype html>
 <html lang="he" dir="rtl">

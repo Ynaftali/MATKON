@@ -1,7 +1,9 @@
+import { waitUntil } from '@vercel/functions'
 import {
   adminInsert, adminInsertReturning, adminSelect, adminCount, getUserFromToken,
 } from './_supabase.js'
 import { sanitizeRecipe, moderateRecipe, recordViolation, recipeContentHash } from './_moderation.js'
+import { persistRecipeImage } from './_image-pipeline.js'
 
 export const config = { runtime: 'nodejs' }
 
@@ -99,6 +101,7 @@ export default async function handler(req, res) {
       tags:        safeTags,
       is_public:   isPublic === true, // private unless the user explicitly opted in
       image_url:   finalImage,
+      image_source: safeImage ? 'user' : 'ai',
       source_url:  safeSource,
     })
     // Count AI image generations (Pollinations) for the resources dashboard.
@@ -109,6 +112,14 @@ export default async function handler(req, res) {
         input_tokens: 0, output_tokens: 0, cost_usd: 0,
       })
     }
+    // Bring the image home in the background — the response below returns now,
+    // the fetch+store (2-45s for a fresh AI image) never blocks the user.
+    waitUntil(persistRecipeImage({
+      recipeId:   created.id,
+      userId,
+      imageUrl:   finalImage,
+      isExternal: !safeImage,
+    }))
     return res.status(200).json({ id: created.id, image_url: finalImage })
   } catch (err) {
     console.error('publish insert error:', err)

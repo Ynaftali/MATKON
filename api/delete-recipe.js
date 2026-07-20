@@ -1,11 +1,9 @@
 import {
   adminSelect, adminDelete, adminInsertReturning, getUserFromToken,
-  deleteStorageObjects, storagePathFromPublicUrl,
 } from './_supabase.js'
+import { deleteRecipeImages } from './_image-pipeline.js'
 
 export const config = { runtime: 'nodejs' }
-
-const BUCKET = 'recipe-images'
 
 // Owner-only permanent delete (brief §242). Removes the recipe from the whole
 // system — FK cascades drop likes / saved / comments / ingredients / steps, so a
@@ -27,7 +25,7 @@ export default async function handler(req, res) {
   if (!id) return res.status(400).json({ error: 'missing_id', message: 'חסר מזהה מתכון' })
 
   // ── Ownership check: only the creator may delete ──
-  const [recipe] = await adminSelect('recipes', `id=eq.${id}&select=user_id,image_url,title`)
+  const [recipe] = await adminSelect('recipes', `id=eq.${id}&select=user_id,image_url,share_image_url,title`)
   if (!recipe) return res.status(404).json({ error: 'not_found', message: 'המתכון לא נמצא' })
   if (recipe.user_id !== userId) {
     return res.status(403).json({ error: 'forbidden', message: 'רק יוצר המתכון יכול למחוק אותו.' })
@@ -64,9 +62,8 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'delete_failed', message: 'שגיאה במחיקת המתכון. נסו שוב.' })
   }
 
-  // Best-effort: remove the recipe's own uploaded image from storage.
-  const path = storagePathFromPublicUrl(BUCKET, recipe.image_url)
-  if (path) await deleteStorageObjects(BUCKET, [path])
+  // Best-effort: remove the recipe's own stored images (main + share) from storage.
+  await deleteRecipeImages({ imageUrl: recipe.image_url, shareImageUrl: recipe.share_image_url })
 
   return res.status(200).json({ ok: true })
 }

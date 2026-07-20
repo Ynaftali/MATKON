@@ -1,7 +1,9 @@
+import { waitUntil } from '@vercel/functions'
 import {
   adminInsert, adminUpdate, adminSelect, getUserFromToken,
 } from './_supabase.js'
 import { sanitizeRecipe, moderateRecipe, recordViolation, recipeContentHash } from './_moderation.js'
+import { persistRecipeImage, deleteRecipeImages } from './_image-pipeline.js'
 
 export const config = { runtime: 'nodejs' }
 
@@ -25,7 +27,7 @@ export default async function handler(req, res) {
   if (!recipe?.title) return res.status(400).json({ error: 'missing_recipe', message: 'חסרים פרטי מתכון' })
 
   // ── Ownership check: only the creator may edit (brief §242) ──
-  const [existing] = await adminSelect('recipes', `id=eq.${id}&select=user_id,image_url,source_url`)
+  const [existing] = await adminSelect('recipes', `id=eq.${id}&select=user_id,image_url,share_image_url,source_url`)
   if (!existing) return res.status(404).json({ error: 'not_found', message: 'המתכון לא נמצא' })
   if (existing.user_id !== userId) {
     return res.status(403).json({ error: 'forbidden', message: 'רק יוצר המתכון יכול לערוך אותו.' })
@@ -76,15 +78,32 @@ export default async function handler(req, res) {
     }
     // Only overwrite image/source when the client actually provided a valid one,
     // so an edit that didn't touch them keeps the existing values.
-    if (safeImage)  patch.image_url  = safeImage
+    const imageReplaced = safeImage && safeImage !== existing.image_url
+    if (safeImage) {
+      patch.image_url = safeImage
+      // Edit only ever attaches a freshly uploaded user photo (never a new AI
+      // generation — that only happens at publish time), so a changed image is
+      // always 'user'. share_image_url is cleared here and rebuilt below so the
+      // share card never shows the old photo while the new crop is in flight.
+      if (imageReplaced) { patch.image_source = 'user'; patch.share_image_url = null }
+    }
     if (safeSource) patch.source_url = safeSource
     await adminUpdate('recipes', `id=eq.${id}`, patch)
     // Count a new AI image generation when the edit replaced the image with one.
-    if (safeImage && safeImage !== existing.image_url && safeImage.includes('pollinations.ai')) {
+    if (safeImage && imageReplaced && safeImage.includes('pollinations.ai')) {
       adminInsert('usage_log', {
         user_id: userId, endpoint: 'generate-image', model: 'pollinations-flux',
         input_tokens: 0, output_tokens: 0, cost_usd: 0,
       })
+    }
+    if (imageReplaced) {
+      // Rebuild the share crop for the new photo, then remove the old copies —
+      // only after the new image is already saved, so a mid-flight failure never
+      // leaves the recipe without any image.
+      waitUntil(
+        persistRecipeImage({ recipeId: id, userId, imageUrl: safeImage, isExternal: false })
+          .then(() => deleteRecipeImages({ imageUrl: existing.image_url, shareImageUrl: existing.share_image_url }))
+      )
     }
     return res.status(200).json({ id })
   } catch (err) {

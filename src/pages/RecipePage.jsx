@@ -437,7 +437,7 @@ export default function RecipePage() {
           />
         )}
         <div className="rpage-hero-overlay" />
-        <AiImageBadge imageUrl={recipe.image_url} />
+        <AiImageBadge source={recipe.image_source} />
         <div className="rpage-hero-top">
           <button className="btn-icon" onClick={() => navigate(-1)}>
             <IconChevronRight size={20} />

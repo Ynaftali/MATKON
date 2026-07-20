@@ -12,6 +12,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",
     "@tabler/icons-react": "^3.44.0",
+    "@vercel/functions": "^3.7.5",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-markdown": "^10.1.0",

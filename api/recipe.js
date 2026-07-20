@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   const rows = await adminSelect(
     'recipes',
     `id=eq.${id}&select=id,title,description,ingredients,steps,prep_time,cook_time,` +
-    `servings,category,level,tags,image_url,source_url,is_public,user_id,created_at,` +
+    `servings,category,level,tags,image_url,image_source,source_url,is_public,user_id,created_at,` +
     `users(full_name,country,bio)`
   )
   const recipe = rows[0]
