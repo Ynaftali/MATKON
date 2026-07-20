@@ -59,12 +59,6 @@ export default function EditRecipe() {
   const [deleting, setDeleting] = useState(false)
   const imgRef = useRef()
 
-  useEffect(() => {
-    if (authLoading) return
-    if (!user) { navigate('/login'); return }
-    load()
-  }, [id, authLoading, user])
-
   async function load() {
     setLoading(true)
     const fromState = location.state?.recipe
@@ -91,6 +85,13 @@ export default function EditRecipe() {
     setLoading(false)
   }
 
+  useEffect(() => {
+    if (authLoading) return
+    if (!user) { navigate('/login'); return }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches the recipe once auth resolves; load() sets its own state once its data arrives
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load is a plain function redeclared every render; only re-fetch when id/authLoading/user actually change
+  }, [id, authLoading, user, navigate])
 
 
   function pickImage(e) {
