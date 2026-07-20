@@ -119,6 +119,7 @@ export default function Shopping() {
       }
     }
     doTranslate()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately NOT reactive to `items`: doTranslate() itself calls setItems, and if the server ever leaves an item's category/name_local unfilled, needsTranslation would stay true forever and a reactive `items` dep would refetch on every render (see CLAUDE.md's warning about careless hook fixes causing render loops). Re-runs only when the country changes; newly added items pick up translation on the next country change or remount.
   }, [profile?.country])
 
   const unchecked = items.filter(i => !i.checked)

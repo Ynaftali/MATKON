@@ -77,6 +77,7 @@ export default function Feed() {
   // so the very first load already excludes the viewer's own recipes.
   useEffect(() => {
     if (!userReady) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets pagination state before loadPage's own fetch fires; both belong to the same filter/user-ready transition
     setRecipes([]); setHasMore(true); loadPage(0, true)
   }, [loadPage, userReady])
 

@@ -34,7 +34,10 @@ export default function NotificationsBell() {
     setUnread(count || 0)
   }, [user])
 
-  useEffect(() => { loadUnread() }, [loadUnread])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches the unread count for the current user; loadUnread sets its own state once it resolves
+    loadUnread()
+  }, [loadUnread])
 
   // Poll for new notifications every 60s while page is open (cheap: a single
   // count(*) head request). A websocket subscription is overkill here.

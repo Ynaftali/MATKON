@@ -6,6 +6,21 @@ export function AuthProvider({ children }) {
   const [user, setUser]       = useState(undefined) // undefined = loading, null = not logged in
   const [profile, setProfile] = useState(null)
 
+  async function loadProfile(userId) {
+    // Public profile fields live in `users`; sensitive `banned` lives in
+    // `user_security`, readable only by the owner. Admin role lives in a
+    // separate Supabase project (matkon.cloud) and is not relevant here.
+    const [{ data: profileRow }, { data: securityRow }] = await Promise.all([
+      supabase.from('users').select('*').eq('id', userId).maybeSingle(),
+      supabase.from('user_security').select('banned').eq('id', userId).maybeSingle(),
+    ])
+    if (!profileRow && !securityRow) return setProfile(null)
+    setProfile({
+      ...(profileRow || { id: userId }),
+      banned: securityRow?.banned || false,
+    })
+  }
+
   useEffect(() => {
     // Get initial session from localStorage (instant, no network)
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -26,21 +41,6 @@ export function AuthProvider({ children }) {
 
     return () => subscription.unsubscribe()
   }, [])
-
-  async function loadProfile(userId) {
-    // Public profile fields live in `users`; sensitive `banned` lives in
-    // `user_security`, readable only by the owner. Admin role lives in a
-    // separate Supabase project (matkon.cloud) and is not relevant here.
-    const [{ data: profileRow }, { data: securityRow }] = await Promise.all([
-      supabase.from('users').select('*').eq('id', userId).maybeSingle(),
-      supabase.from('user_security').select('banned').eq('id', userId).maybeSingle(),
-    ])
-    if (!profileRow && !securityRow) return setProfile(null)
-    setProfile({
-      ...(profileRow || { id: userId }),
-      banned: securityRow?.banned || false,
-    })
-  }
 
   async function refreshProfile() {
     const { data: { session } } = await supabase.auth.getSession()

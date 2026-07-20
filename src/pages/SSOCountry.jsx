@@ -39,7 +39,7 @@ export default function SSOCountry() {
   // Only reachable after an OAuth sign-in — bounce anyone else to login.
   useEffect(() => {
     if (!loading && !user) navigate('/login', { replace: true })
-  }, [loading, user])
+  }, [loading, user, navigate])
 
   const valid = COUNTRIES.includes(country) && tos && (!needsCode || code.length >= 4)
 

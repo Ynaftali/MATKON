@@ -77,7 +77,7 @@ export default function AddRecipe() {
   // form and hit a silent failure.
   useEffect(() => {
     if (!loading && !user) navigate('/login', { replace: true })
-  }, [loading, user])
+  }, [loading, user, navigate])
   const [step, setStep]           = useState(1)
   const [inputType, setInputType] = useState('text')
   const [text, setText]           = useState('')

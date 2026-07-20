@@ -34,7 +34,7 @@ export default function Login() {
       onError: () => setError('הכניסה המהירה לא הצליחה. אפשר לנסות שוב או להיכנס עם סיסמה.'),
     })
     return () => ctrl.abort()
-  }, [])
+  }, [navigate])
 
   const submit = async e => {
     e.preventDefault()
