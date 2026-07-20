@@ -52,14 +52,17 @@ export default function Recipes() {
   const [commLoadingMore, setCommLoadingMore] = useState(false)
   const commSentinelRef = useRef(null)
 
-  // Set default community country to user's country
+  // Set default community country to user's country. Runs once profile loads;
+  // the guard (communityCountry === null) keeps it from firing again after the
+  // user picks a filter themselves, so the synchronous setState here can't cascade.
   useEffect(() => {
     if (profile?.country && communityCountry === null) {
       // Check if user country is in our filter list
       const found = COUNTRY_FILTERS.find(f => f.code === profile.country)
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time default derived from an async prop, guarded by communityCountry === null so it can't loop
       if (found) setCommunityCountry(profile.country)
     }
-  }, [profile])
+  }, [profile, communityCountry])
 
   // Order the country chips: the user's own country first (see your local
   // community before anything else), then "כולם", then the rest alphabetically.
@@ -71,22 +74,6 @@ export default function Recipes() {
     return [mine, all, ...rest].filter(Boolean)
   }, [profile])
 
-  useEffect(() => {
-    if (authLoading) return
-    if (user) {
-      loadMyRecipes(user.id)
-      loadLiked(user.id)
-      loadSaved(user.id)
-    } else {
-      setLoading(false)
-    }
-  }, [user, authLoading])
-
-  // Reload community when tab changes to community or country changes
-  useEffect(() => {
-    if (tab === 'community') { setCommunity([]); setCommHasMore(true); loadCommunity(0, true) }
-  }, [tab, communityCountry])
-
   async function loadMyRecipes(userId) {
     setLoading(true)
     const { data } = await supabase
@@ -96,6 +83,36 @@ export default function Recipes() {
       .order('created_at', { ascending: false })
     setMyRecipes(data || [])
     setLoading(false)
+  }
+
+  async function loadSaved(userId) {
+    const { data: savedRows } = await supabase
+      .from('saved')
+      .select('recipe_id')
+      .eq('user_id', userId)
+    if (!savedRows?.length) return setSaved([])
+    const ids = savedRows.map(s => s.recipe_id)
+    const { data } = await supabase
+      .from('recipes')
+      .select('*, users(full_name, country), likes(count), recipe_comments(count)')
+      .in('id', ids)
+      .order('created_at', { ascending: false })
+    setSaved(data || [])
+  }
+
+  async function loadLiked(userId) {
+    const { data: likeRows } = await supabase
+      .from('likes')
+      .select('recipe_id')
+      .eq('user_id', userId)
+    if (!likeRows?.length) return setLiked([])
+    const ids = likeRows.map(l => l.recipe_id)
+    const { data } = await supabase
+      .from('recipes')
+      .select('*, users(full_name, country), likes(count), recipe_comments(count)')
+      .in('id', ids)
+      .order('created_at', { ascending: false })
+    setLiked(data || [])
   }
 
   const PAGE_SIZE = 12
@@ -142,6 +159,26 @@ export default function Recipes() {
     setLoading(false); setCommLoadingMore(false)
   }, [communityCountry, user])
 
+  useEffect(() => {
+    if (authLoading) return
+    if (user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- kicks off the three per-tab fetches for the newly logged-in user; each sets its own state once its data arrives
+      loadMyRecipes(user.id)
+      loadLiked(user.id)
+      loadSaved(user.id)
+    } else {
+      setLoading(false)
+    }
+  }, [user, authLoading])
+
+  // Reload community when tab changes to community or country changes
+  useEffect(() => {
+    if (tab === 'community') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets pagination state before loadCommunity's own fetch fires; both belong to the same tab/country transition
+      setCommunity([]); setCommHasMore(true); loadCommunity(0, true)
+    }
+  }, [tab, communityCountry, loadCommunity])
+
   // Infinite scroll for the community tab
   useEffect(() => {
     if (tab !== 'community' || !commHasMore || loading || commLoadingMore) return
@@ -153,36 +190,6 @@ export default function Recipes() {
     io.observe(el)
     return () => io.disconnect()
   }, [tab, commHasMore, loading, commLoadingMore, community.length, loadCommunity])
-
-  async function loadSaved(userId) {
-    const { data: savedRows } = await supabase
-      .from('saved')
-      .select('recipe_id')
-      .eq('user_id', userId)
-    if (!savedRows?.length) return setSaved([])
-    const ids = savedRows.map(s => s.recipe_id)
-    const { data } = await supabase
-      .from('recipes')
-      .select('*, users(full_name, country), likes(count), recipe_comments(count)')
-      .in('id', ids)
-      .order('created_at', { ascending: false })
-    setSaved(data || [])
-  }
-
-  async function loadLiked(userId) {
-    const { data: likeRows } = await supabase
-      .from('likes')
-      .select('recipe_id')
-      .eq('user_id', userId)
-    if (!likeRows?.length) return setLiked([])
-    const ids = likeRows.map(l => l.recipe_id)
-    const { data } = await supabase
-      .from('recipes')
-      .select('*, users(full_name, country), likes(count), recipe_comments(count)')
-      .in('id', ids)
-      .order('created_at', { ascending: false })
-    setLiked(data || [])
-  }
 
   return (
     <div className="page page-with-nav">
