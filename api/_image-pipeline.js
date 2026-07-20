@@ -2,9 +2,7 @@ import { Buffer } from 'node:buffer'
 import sharp from 'sharp'
 import { adminUpdate, deleteStorageObjects, storagePathFromPublicUrl } from './_supabase.js'
 
-// eslint-disable-next-line no-undef -- Node runtime (config.runtime = 'nodejs'), same as api/_supabase.js
 const SUPABASE_URL     = process.env.VITE_SUPABASE_URL
-// eslint-disable-next-line no-undef -- Node runtime (config.runtime = 'nodejs'), same as api/_supabase.js
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 const BUCKET = 'recipe-images'
 const MAIN_MAX = 1200 // existing standard: same ceiling as a user's own client-side upload
