@@ -114,7 +114,7 @@ export function sanitizeRecipe({ recipe, tags, image_url, source_url }) {
     })).filter(s => s.text),
     prep_time: clampInt(recipe.prep_time, 10000),
     cook_time: clampInt(recipe.cook_time, 10000),
-    servings:  clampInt(recipe.servings, 1000) || 2,
+    servings:  clampInt(recipe.servings, 1000) || 4,
     level:     ['קל', 'בינוני', 'מורכב'].includes(clean(recipe.level)) ? clean(recipe.level) : 'קל',
   }
   const safeTags   = (Array.isArray(tags) ? tags : []).slice(0, 20).map(t => clampStr(t, 40)).filter(Boolean)
