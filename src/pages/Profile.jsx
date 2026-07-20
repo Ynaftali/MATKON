@@ -39,45 +39,9 @@ export default function Profile() {
 
   const showPasskeys = canUsePasskeys(user)
 
-  useEffect(() => {
-    if (!authLoading && !user) { navigate('/login'); return }
-    if (user) { loadRecipes(user.id); loadSaved(user.id); loadCounts(user.id) }
-  }, [user, authLoading])
-
-  useEffect(() => {
-    if (editOpen && showPasskeys) loadPasskeys()
-  }, [editOpen])
-
   async function loadPasskeys() {
     const { data } = await supabase.auth.passkey.list()
     setPasskeys(data || [])
-  }
-
-  async function addPasskey() {
-    setPkBusy(true)
-    const { error } = await supabase.auth.registerPasskey()
-    setPkBusy(false)
-    if (error) {
-      if (!isPasskeyCancel(error)) {
-        setToast('הפעלת הכניסה המהירה לא הצליחה')
-        setTimeout(() => setToast(''), 2500)
-      }
-      return
-    }
-    await loadPasskeys()
-    setToast('כניסה מהירה הופעלה ✓')
-    setTimeout(() => setToast(''), 2500)
-  }
-
-  async function deletePasskey(k) {
-    setPkBusy(true)
-    const { error } = await supabase.auth.passkey.delete({ passkeyId: k.id })
-    setPkBusy(false)
-    if (!error) {
-      setPasskeys(p => p.filter(x => x.id !== k.id))
-      setToast('המפתח הוסר')
-      setTimeout(() => setToast(''), 2500)
-    }
   }
 
   async function loadCounts(userId) {
@@ -117,6 +81,44 @@ export default function Profile() {
       .order('created_at', { ascending: false })
     setSaved(data || [])
     setSavedLoading(false)
+  }
+
+  useEffect(() => {
+    if (!authLoading && !user) { navigate('/login'); return }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- kicks off the three per-tab fetches once the logged-in user resolves; each sets its own state once its data arrives
+    if (user) { loadRecipes(user.id); loadSaved(user.id); loadCounts(user.id) }
+  }, [user, authLoading, navigate])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches passkeys only when the edit sheet opens, not on every render
+    if (editOpen && showPasskeys) loadPasskeys()
+  }, [editOpen, showPasskeys])
+
+  async function addPasskey() {
+    setPkBusy(true)
+    const { error } = await supabase.auth.registerPasskey()
+    setPkBusy(false)
+    if (error) {
+      if (!isPasskeyCancel(error)) {
+        setToast('הפעלת הכניסה המהירה לא הצליחה')
+        setTimeout(() => setToast(''), 2500)
+      }
+      return
+    }
+    await loadPasskeys()
+    setToast('כניסה מהירה הופעלה ✓')
+    setTimeout(() => setToast(''), 2500)
+  }
+
+  async function deletePasskey(k) {
+    setPkBusy(true)
+    const { error } = await supabase.auth.passkey.delete({ passkeyId: k.id })
+    setPkBusy(false)
+    if (!error) {
+      setPasskeys(p => p.filter(x => x.id !== k.id))
+      setToast('המפתח הוסר')
+      setTimeout(() => setToast(''), 2500)
+    }
   }
 
   // Open the edit sheet — split the stored full_name back into first / last
