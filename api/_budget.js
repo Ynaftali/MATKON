@@ -23,3 +23,22 @@ export async function checkAiBudget(endpoint) {
     return { overHard: false }
   }
 }
+
+// Monthly call-count cap for Supadata video extraction (app_config →
+// video_extract_monthly_cap). Counts calls, not dollars, because Supadata
+// bills a flat monthly credit allowance rather than per-call USD.
+export async function checkVideoExtractBudget() {
+  try {
+    const s = await adminRpc('video_extract_budget_status')
+    if (!s) return { overHard: false }
+    if (s.over_hard) {
+      console.error(`[VIDEO EXTRACT BUDGET] HARD STOP — ${s.mtd} calls ≥ cap ${s.cap} this month.`)
+    } else if (s.near_soft) {
+      console.warn(`[VIDEO EXTRACT BUDGET] ${s.pct}% of monthly cap used (${s.mtd} / ${s.cap}).`)
+    }
+    return { overHard: !!s.over_hard, nearSoft: !!s.near_soft, mtd: s.mtd, cap: s.cap }
+  } catch (err) {
+    console.error('[VIDEO EXTRACT BUDGET] status check failed (allowing through):', err)
+    return { overHard: false }
+  }
+}

@@ -12,5 +12,8 @@
       "destination": "/api/share-preview?id=:id"
     },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
-  ]
+  ],
+  "functions": {
+    "api/parse-recipe.js": { "maxDuration": 60 }
+  }
 }

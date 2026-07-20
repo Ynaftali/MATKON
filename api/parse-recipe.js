@@ -1,6 +1,7 @@
 import { adminInsert, adminCount, adminSelect, getUserFromToken } from './_supabase.js'
 import { moderateRawInput, recordViolation, hashContent, clampStr } from './_moderation.js'
-import { checkAiBudget } from './_budget.js'
+import { checkAiBudget, checkVideoExtractBudget } from './_budget.js'
+import { isVideoUrl, extractVideoRecipe, formatVideoRecipeAsText } from './_video-extract.js'
 
 export const config = { runtime: 'nodejs' }
 
@@ -92,16 +93,25 @@ export default async function handler(req, res) {
       { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageBase64 } },
       { type: 'text', text: 'זהו צילום מסך או תמונה של מתכון. חלץ את המתכון בהתאם להוראות.' },
     ]
+  } else if (url && isVideoUrl(url)) {
+    const budget = await checkVideoExtractBudget()
+    if (budget.overHard) {
+      return res.status(422).json({
+        error: 'video_budget_exhausted',
+        message: 'הגענו למגבלת החילוץ מווידאו לחודש זה. העתק את הטקסט ידנית ושלח אותו.',
+      })
+    }
+    const extraction = await extractVideoRecipe(url, userId)
+    if (!extraction.ok) {
+      return res.status(422).json({
+        error: 'video_extract_failed',
+        message: 'לא הצלחנו לחלץ מתכון מהווידאו הזה. העתק את הטקסט ידנית ושלח אותו.',
+      })
+    }
+    userContent = `חלץ מתכון מתוכן הווידאו הבא:\n\n${formatVideoRecipeAsText(extraction.data)}`
   } else if (url) {
     let pageText
     try {
-      const blocked = ['instagram.com', 'tiktok.com', 'facebook.com']
-      if (blocked.some(d => url.includes(d))) {
-        return res.status(422).json({
-          error: 'blocked',
-          message: 'אינסטגרם/טיקטוק חוסמות גרידה אוטומטית. העתק את הטקסט ידנית ושלח אותו.',
-        })
-      }
       const response = await fetch(url, {
         headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Matkonbot/1.0)' },
         signal: AbortSignal.timeout(8000),
