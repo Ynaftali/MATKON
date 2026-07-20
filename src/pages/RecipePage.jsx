@@ -103,9 +103,18 @@ export default function RecipePage() {
     setTimeout(() => setToast(''), 2500)
   }
 
-  useEffect(() => {
-    loadRecipe()
-  }, [id])
+  async function loadComments(recipeId) {
+    try {
+      const { data } = await supabase
+        .from('recipe_comments')
+        .select('id, content, created_at, users(full_name, country)')
+        .eq('recipe_id', recipeId || id)
+        .order('created_at', { ascending: true })
+      if (data) setComments(data)
+    } catch {
+      // table may not exist yet — stay empty
+    }
+  }
 
   async function loadRecipe() {
     setLoading(true)
@@ -147,17 +156,6 @@ export default function RecipePage() {
     loadComments(id)
   }
 
-  // Liked/saved state depends on both the recipe id AND the async auth
-  // resolution — on a fresh page load loadRecipe() runs before AuthContext
-  // has a user (stale closure), so this must be its own effect keyed on the
-  // user. Without it the heart/bookmark always render empty after a reload.
-  useEffect(() => {
-    if (currentUser?.id) {
-      loadLike(id)
-      loadSaved(id)
-    }
-  }, [currentUser?.id, id])
-
   async function loadLike(recipeId) {
     const { data } = await supabase
       .from('likes')
@@ -177,6 +175,25 @@ export default function RecipePage() {
       .maybeSingle()
     setSaved(!!data)
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches the recipe for the newly-navigated id; loadRecipe sets its own state once its data arrives
+    loadRecipe()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadRecipe is a plain function redeclared every render; only re-fetch when the recipe id itself changes
+  }, [id])
+
+  // Liked/saved state depends on both the recipe id AND the async auth
+  // resolution — on a fresh page load loadRecipe() runs before AuthContext
+  // has a user (stale closure), so this must be its own effect keyed on the
+  // user. Without it the heart/bookmark always render empty after a reload.
+  useEffect(() => {
+    if (currentUser?.id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches like/save state once the user resolves; each sets its own state once its data arrives
+      loadLike(id)
+      loadSaved(id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadLike/loadSaved are plain functions redeclared every render; only re-fetch when the user or recipe id changes
+  }, [currentUser?.id, id])
 
   async function toggleSave() {
     if (!currentUser) { setGateOpen(true); return }
@@ -198,19 +215,6 @@ export default function RecipePage() {
   const ratio     = recipe ? servings / (recipe.servings || 4) : 1
   const gradient  = CATEGORY_GRADIENTS[recipe?.category] || 'linear-gradient(160deg, #1e3a6e, #3d6fa8)'
   const user      = recipe?.users || {}
-
-  async function loadComments(recipeId) {
-    try {
-      const { data } = await supabase
-        .from('recipe_comments')
-        .select('id, content, created_at, users(full_name, country)')
-        .eq('recipe_id', recipeId || id)
-        .order('created_at', { ascending: true })
-      if (data) setComments(data)
-    } catch {
-      // table may not exist yet — stay empty
-    }
-  }
 
   async function sendComment() {
     if (!newComment.trim() || sending) return
