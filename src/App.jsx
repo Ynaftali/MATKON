@@ -13,7 +13,7 @@ function BanGuard() {
     if (profile?.banned && location.pathname !== '/blocked') {
       navigate('/blocked', { replace: true })
     }
-  }, [profile, location.pathname])
+  }, [profile, location.pathname, navigate])
   return null
 }
 
@@ -69,7 +69,7 @@ function AuthCallback() {
       if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user) route(session.user)
     })
     return () => subscription.unsubscribe()
-  }, [])
+  }, [navigate])
   return (
     <div className="auth-page" style={{ textAlign: 'center', paddingTop: 80, color: 'var(--text-2)' }}>
       מתחברים...
