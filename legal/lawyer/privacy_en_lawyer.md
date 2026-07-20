@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated: [to be set at publication]**
+**Last updated: July 20, 2026**
 
 > This English version is the binding version. A Hebrew translation is provided for the convenience of Hebrew-speaking users. In the event of any inconsistency, the English version prevails, subject to any mandatory consumer-protection rights in your country of residence.
 
@@ -65,6 +65,7 @@ We use service providers (data processors) to operate the Service. They may proc
 | **Pollinations** | Recipe image generation | A textual description (prompt) of the recipe | Germany (based in Berlin); infrastructure distributed across international cloud providers |
 | **Vercel** | Hosting and running the Service | Technical access data and logs (including IP) | United States (default function region); content network is global |
 | **Google / Apple** | Third-party sign-in (SSO) | Basic account information, if you chose this option | United States |
+| **Supadata** | Extracting a recipe from a video link (TikTok/Instagram/YouTube) | The video link you provided | Germany (Dumpling Software UG, Berlin) |
 
 These providers are subject to their own privacy policies. We select providers committed to data protection and, where necessary, enter into appropriate processing agreements with them. In addition, we may disclose information if required to do so by law, court order, or to protect rights, safety and security.
 

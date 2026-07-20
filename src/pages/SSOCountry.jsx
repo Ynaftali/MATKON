@@ -128,7 +128,10 @@ export default function SSOCountry() {
             <a href="/terms" target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: 'var(--blue-light)', textDecoration: 'underline' }}>
               תנאי השימוש
             </a>{' '}
-            ומדיניות הפרטיות
+            ו
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ color: 'var(--blue-light)', textDecoration: 'underline' }}>
+              מדיניות הפרטיות
+            </a>
           </span>
         </label>
 

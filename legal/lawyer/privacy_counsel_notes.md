@@ -14,7 +14,7 @@
 
 **Section 4 (Purposes / legal basis).** If EU users are onboarded, prepare an internal Legitimate Interests Assessment (LIA) for each Art 6(1)(f) purpose.
 
-**Section 5 (Processors).** Confirm that Data Processing Agreements and, for EU transfers, Standard Contractual Clauses are in place with each provider. Verify the actual Vercel function region in the dashboard. Consider whether Pollinations' distributed infrastructure requires further transfer disclosure. Consider adding a link to Anthropic's policy that it does not train models on API inputs.
+**Section 5 (Processors).** Confirm that Data Processing Agreements and, for EU transfers, Standard Contractual Clauses are in place with each provider. Verify the actual Vercel function region in the dashboard. Consider whether Pollinations' distributed infrastructure requires further transfer disclosure. Consider adding a link to Anthropic's policy that it does not train models on API inputs. **Added 20 July 2026:** Supadata (video-link recipe extraction, Dumpling Software UG, Berlin) is a new processor; needs the same DPA/SCC treatment as the other EU-based providers.
 
 **Section 6 (International transfers).** Confirm the actual transfer mechanism. Japan holds an EU adequacy decision; US transfers may rely on the Data Privacy Framework or Standard Contractual Clauses. Confirm the wording satisfies NZ Privacy Act IPP 12 (cross-border disclosure).
 

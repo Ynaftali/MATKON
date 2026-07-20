@@ -203,7 +203,7 @@ export default function Register() {
             style={{ marginTop:3, width:18, height:18, flexShrink:0, accentColor:'#3d6fa8', cursor:'pointer' }}
           />
           <span>
-            קראתי ואני מסכים/ה ל<a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color:'var(--blue-light)' }}>תנאי השימוש</a>
+            קראתי ואני מסכים/ה ל<a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color:'var(--blue-light)' }}>תנאי השימוש</a> ול<a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color:'var(--blue-light)' }}>מדיניות הפרטיות</a>
           </span>
         </label>
 

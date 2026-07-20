@@ -132,7 +132,15 @@ export function normalizeIngredientName(name) {
   if (!s) return ''
   s = s.replace(/[֑-ׇ]/g, '')       // niqqud / cantillation
   s = s.replace(/["'׳״`]/g, '')                // geresh, gershayim, quotes
-  s = s.replace(/\s+/g, ' ')                   // collapse whitespace
+  // Size notes ("ביצים גודל L", "ביצים (גודל L)", "eggs (size L)") describe
+  // which size to buy, not a different product — strip them before comparing
+  // so the same ingredient in different sizes across recipes still merges.
+  s = s.replace(/[([][^)\]]*[)\]]/g, '')
+  // No \b before "גודל": JS regex word boundaries only recognize ASCII
+  // word characters, so \b never matches around Hebrew letters.
+  s = s.replace(/גודל\s+\S+/g, '')
+  s = s.replace(/\bsize\s+\S+/g, '')
+  s = s.replace(/\s+/g, ' ').trim()            // collapse whitespace
   s = s.replace(/יי/g, 'י').replace(/וו/g, 'ו') // ktiv male variants
   // Suffixes must be stripped BEFORE folding final forms: once ם becomes מ, the
   // plural "ים" reads as "ימ" and stops matching.

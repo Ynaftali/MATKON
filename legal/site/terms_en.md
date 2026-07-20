@@ -1,6 +1,6 @@
 # Terms of Use
 
-**Last updated: [to be set at publication]**
+**Last updated: July 20, 2026**
 
 > This English version is the binding version. A Hebrew translation is provided for the convenience of Hebrew-speaking users. In the event of any inconsistency, the English version prevails, subject to any mandatory consumer-protection rights in your country of residence.
 

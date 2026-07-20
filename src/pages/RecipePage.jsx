@@ -679,7 +679,7 @@ export default function RecipePage() {
       {/* Shopping list drawer */}
       {shoppingOpen && (
         <div className="drawer-overlay" onClick={() => setShoppingOpen(false)}>
-          <div className="drawer" onClick={e => e.stopPropagation()}>
+          <div className="drawer" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh' }}>
             <div className="drawer-header">
               <span className="drawer-title">רשימת קניות — {recipe.title}</span>
               <button className="btn-icon" onClick={() => setShoppingOpen(false)}>✕</button>
