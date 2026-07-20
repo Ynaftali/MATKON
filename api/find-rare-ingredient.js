@@ -7,13 +7,43 @@ export const config = { runtime: 'nodejs' }
 // User-triggered (click on the "rare ingredient" arrow), so the cap is
 // generous relative to a per-recipe automatic call, but still bounded.
 const RATE_LIMIT_PER_HOUR = 15
-const MODEL = 'claude-haiku-4-5'
-const COST_PER_INPUT_TOKEN  = 0.0000008
-const COST_PER_OUTPUT_TOKEN = 0.000004
+const MODEL = 'claude-sonnet-5'
+const COST_PER_INPUT_TOKEN  = 0.000003
+const COST_PER_OUTPUT_TOKEN = 0.000015
 const COST_PER_SEARCH       = 0.01 // Anthropic web_search tool: $10 / 1,000 searches
 
 function normalize(s) {
   return String(s || '').trim().toLowerCase().slice(0, 200)
+}
+
+// The model sometimes invents a plausible-looking store URL despite the system
+// prompt forbidding it — a real domain with a fabricated product path, or a
+// store that doesn't exist at all. The only reliable check is to actually
+// fetch the link. HEAD first (cheaper), fall back to GET if the server
+// rejects HEAD (405/403 — common on storefronts).
+async function isLinkAlive(url) {
+  const tryFetch = async (method) => {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 6000)
+    try {
+      return await fetch(url, {
+        method,
+        redirect: 'follow',
+        signal: controller.signal,
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MatkonBot/1.0)' },
+      })
+    } finally {
+      clearTimeout(timeout)
+    }
+  }
+
+  try {
+    let res = await tryFetch('HEAD')
+    if (res.status === 405 || res.status === 403) res = await tryFetch('GET')
+    return res.ok
+  } catch {
+    return false
+  }
 }
 
 export default async function handler(req, res) {
@@ -73,6 +103,8 @@ export default async function handler(req, res) {
 
   const system = `You are a shopping assistant helping someone find where to buy a specific food ingredient in their country of residence. Use the web_search tool to find real, currently existing stores — do not invent store names or URLs.
 
+Before searching, identify what the ingredient actually IS in a kitchen/cooking context — never translate the Hebrew word literally. Hebrew food words are often ambiguous out of context and a literal translation can name a completely different product (for example "פתיתים" is a small Israeli pasta shape, not "flakes" and not breadcrumbs; "קורנפלור" is cornstarch, not corn flour). Think about what dish or cuisine this ingredient belongs to, then search using the correct culinary name in the local language or English.
+
 After searching, respond with ONLY a JSON array (no markdown fences, no explanation) of up to 3 real stores where this ingredient can be bought, each with a working URL to that store or a specific product page:
 [{"name": "Store Name", "url": "https://..."}]
 
@@ -90,10 +122,11 @@ If you cannot find any real stores after searching, return an empty array: []`
         model:      MODEL,
         max_tokens: 1024,
         system,
-        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
+        thinking: { type: 'disabled' },
+        tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3 }],
         messages: [{
           role: 'user',
-          content: `Ingredient (may be written in Hebrew): ${ingredient}\nCountry: ${en}\nLocal language: ${lang}\n\nFirst determine this ingredient's common name in ${lang} or English. Then use web_search to find real stores (online, or with delivery) in ${en} where it can be purchased. Search using the local/English ingredient name — never the Hebrew text.`,
+          content: `Ingredient (may be written in Hebrew): ${ingredient}\nCountry: ${en}\nLocal language: ${lang}\n\nFirst identify what this ingredient actually is in a cooking context (not a literal word-for-word translation), and its correct culinary name in ${lang} or English. Then use web_search to find real stores (online, or with delivery) in ${en} where it can be purchased. Search using that correct culinary name — never a literal translation of the Hebrew text.`,
         }],
       }),
     })
@@ -115,8 +148,8 @@ If you cannot find any real stores after searching, return an empty array: []`
       cost_usd:      costUsd,
     })
 
-    // Haiku frequently wraps the JSON in prose after a web search (e.g. "Based on
-    // my search, here are stores: [...]") and may split it across several text
+    // The model frequently wraps the JSON in prose after a web search (e.g. "Based
+    // on my search, here are stores: [...]") and may split it across several text
     // blocks — so parsing the whole concatenated blob throws and we'd drop real
     // results. Extract the JSON array substring itself instead.
     const textBlock = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n')
@@ -129,6 +162,11 @@ If you cannot find any real stores after searching, return an empty array: []`
       .filter(s => s && typeof s.url === 'string' && /^https?:\/\//i.test(s.url) && typeof s.name === 'string')
       .slice(0, 3)
       .map(s => ({ name: s.name.slice(0, 100), url: s.url.slice(0, 500) }))
+
+    // Verify every link actually resolves before it reaches the user or the
+    // shared cache — the model invents URLs despite being told not to.
+    const aliveFlags = await Promise.all(stores.map(s => isLinkAlive(s.url)))
+    stores = stores.filter((_, i) => aliveFlags[i])
 
     if (stores.length > 0) {
       // Awaited (unlike the usage_log write above) — losing this defeats the
