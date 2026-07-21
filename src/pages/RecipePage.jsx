@@ -707,7 +707,7 @@ export default function RecipePage() {
                         <span>{qty} {unit} </span>
                         <span>{name}</span>
                         {localName && localName !== name && (
-                          <span style={{ color:'var(--text-muted)', fontWeight:400 }}> · {localName}</span>
+                          <span className="shopping-name-local"> | {localName}</span>
                         )}
                       </div>
                       {whereBuy && (

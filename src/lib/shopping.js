@@ -202,7 +202,12 @@ export function addIngredientsToList(ingredients, recipeTitle) {
       restored.checked = false
       restored.qty     = +(restored.qty + qty).toFixed(2)
       restored.recipes = [...new Set([...(restored.recipes || []), recipeTitle].filter(Boolean))]
-      restored.category = restored.category || categorizeIngredient(name)
+      // Force a fresh translation/category rather than carrying forward a
+      // possibly-stale value from before the item was deleted (e.g. from an
+      // older, buggy AI response) — every (re)add goes through the same
+      // enrichment check on the next Shopping page load.
+      restored.name_local = null
+      restored.category   = categorizeIngredient(name)
       existing.push(restored)
       continue
     }
@@ -218,8 +223,8 @@ export function addIngredientsToList(ingredients, recipeTitle) {
         name,
         unit,
         qty,
-        name_local: ing.name_local || null,
-        category:   ing.category   || categorizeIngredient(name),
+        name_local: null,
+        category:   categorizeIngredient(name),
         checked:    false,
         recipes:    recipeTitle ? [recipeTitle] : [],
       })

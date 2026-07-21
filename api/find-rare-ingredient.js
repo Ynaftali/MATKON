@@ -123,7 +123,13 @@ If you cannot find any real stores after searching, return an empty array: []`
         max_tokens: 1024,
         system,
         thinking: { type: 'disabled' },
-        tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3 }],
+        // Each search round adds tens of seconds; 3 rounds pushed real calls
+        // past 3-4 minutes, long enough that mobile networks drop the
+        // connection before the response arrives (confirmed in production
+        // logs: the call succeeded server-side after the client had already
+        // errored out). 2 rounds trades a little result breadth for a much
+        // more reliable round trip.
+        tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 2 }],
         messages: [{
           role: 'user',
           content: `Ingredient (may be written in Hebrew): ${ingredient}\nCountry: ${en}\nLocal language: ${lang}\n\nFirst identify what this ingredient actually is in a cooking context (not a literal word-for-word translation), and its correct culinary name in ${lang} or English. Then use web_search to find real stores (online, or with delivery) in ${en} where it can be purchased. Search using that correct culinary name — never a literal translation of the Hebrew text.`,
