@@ -5,9 +5,14 @@ import { resolveCountry } from './_countries.js'
 export const config = { runtime: 'nodejs' }
 
 const RATE_LIMIT_PER_HOUR = 20
-const MODEL = 'claude-haiku-4-5'
-const COST_PER_INPUT_TOKEN  = 0.0000008
-const COST_PER_OUTPUT_TOKEN = 0.000004
+// Haiku mistranslated niche Hebrew culinary terms (e.g. זעתר → "thyme",
+// סחוג → "tahini") even after sharpening the prompt — a model knowledge gap,
+// not a wording problem. Sonnet 5 fixed the same class of error in
+// find-rare-ingredient.js; at this endpoint's tiny per-call text volume the
+// cost difference is negligible.
+const MODEL = 'claude-sonnet-5'
+const COST_PER_INPUT_TOKEN  = 0.000003
+const COST_PER_OUTPUT_TOKEN = 0.000015
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
