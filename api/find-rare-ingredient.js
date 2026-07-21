@@ -1,4 +1,4 @@
-import { adminInsert, adminCount, adminSelect, getUserFromToken } from './_supabase.js'
+import { adminInsert, adminDelete, adminCount, adminSelect, getUserFromToken } from './_supabase.js'
 import { checkAiBudget } from './_budget.js'
 import { resolveCountry } from './_countries.js'
 
@@ -8,6 +8,11 @@ export const config = { runtime: 'nodejs' }
 // generous relative to a per-recipe automatic call, but still bounded.
 const RATE_LIMIT_PER_HOUR = 15
 const MODEL = 'sonar-pro'
+// A cached answer never re-verifies itself, so without a TTL it would serve
+// a wrong or dead-store answer forever — including one cached before a future
+// prompt/logic fix. 30 days: stores don't close weekly, and re-fetching more
+// often than that would spend AI budget for no real freshness gain.
+const CACHE_TTL_MS = 30 * 24 * 3600_000
 
 function normalize(s) {
   return String(s || '').trim().toLowerCase().slice(0, 200)
@@ -71,13 +76,16 @@ export default async function handler(req, res) {
   }
 
   // ── Cache: same (ingredient, country) pair is a free DB read after the
-  // first lookup, across all recipes and users. ──────────────────────────
+  // first lookup, across all recipes and users. Expires after CACHE_TTL_MS
+  // (see above) — an expired row is treated as a miss and falls through to
+  // a fresh search, which then replaces it (see the write path below). ──
   const cached = await adminSelect(
     'rare_ingredient_stores',
-    `ingredient=eq.${encodeURIComponent(ingredient)}&country=eq.${encodeURIComponent(country)}&select=stores&limit=1`
+    `ingredient=eq.${encodeURIComponent(ingredient)}&country=eq.${encodeURIComponent(country)}&select=stores,created_at&limit=1`
   )
-  if (cached?.[0]?.stores) {
-    return res.status(200).json({ stores: cached[0].stores, cached: true })
+  const cachedRow = cached?.[0]
+  if (cachedRow?.stores && Date.now() - new Date(cachedRow.created_at).getTime() < CACHE_TTL_MS) {
+    return res.status(200).json({ stores: cachedRow.stores, cached: true })
   }
 
   // ── Rate limiting ────────────────────────────────────
@@ -166,9 +174,18 @@ Requesting 5 rather than 3 is deliberate — some of these get discarded by a li
     stores = stores.filter((_, i) => aliveFlags[i]).slice(0, 3)
 
     if (stores.length > 0) {
+      // (ingredient, country) is a unique constraint, so refreshing an expired
+      // row means deleting it first — a plain insert would violate the
+      // constraint and the cache would silently stay stale forever. The
+      // delete is a no-op (and never throws) when there was nothing to expire.
       // Awaited (unlike the usage_log write above) — losing this defeats the
       // whole point of the cache, and Vercel can kill in-flight unawaited
       // promises the instant the response is sent.
+      try {
+        await adminDelete('rare_ingredient_stores', `ingredient=eq.${encodeURIComponent(ingredient)}&country=eq.${encodeURIComponent(country)}`)
+      } catch (err) {
+        console.error('rare_ingredient_stores cache refresh (delete) failed:', err)
+      }
       await adminInsert('rare_ingredient_stores', { ingredient, country, stores })
     }
 
