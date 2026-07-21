@@ -700,12 +700,6 @@ p  { line-height: 1.6; }
   font-size: .72rem; color: var(--text-muted); background: var(--bg-elevated);
   border-radius: 999px; padding: 2px 8px; min-width: 22px; text-align: center;
 }
-.shopping-deleted-row {
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 8px; border-bottom: 1px solid var(--border);
-}
-.shopping-deleted-row:last-child { border-bottom: none; }
-
 /* Notifications drawer (Brief §244) */
 .notification-row {
   display: flex; gap: 10px; padding: 12px 4px;

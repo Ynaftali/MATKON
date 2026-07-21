@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react'
-import { IconTrash, IconShare, IconCheck, IconShoppingCart, IconArchive, IconArrowBackUp, IconX, IconChevronDown, IconExternalLink } from '@tabler/icons-react'
+import { IconTrash, IconShare, IconCheck, IconShoppingCart, IconChevronDown, IconExternalLink } from '@tabler/icons-react'
 import {
-  getShoppingList, getDeletedShoppingItems,
-  toggleShoppingItem, moveCheckedToDeleted, setAllShoppingChecked,
-  restoreDeletedItem, permanentlyDeleteItem, clearDeletedLibrary,
+  getShoppingList, toggleShoppingItem, deleteCheckedItems, setAllShoppingChecked,
   updateItemsEnrichment, groupByCategory,
 } from '../lib/shopping'
 import { useAuth } from '../lib/useAuth'
@@ -26,9 +24,7 @@ function qtyPrefix(item) {
 }
 
 export default function Shopping() {
-  const [items, setItems]           = useState(getShoppingList)
-  const [deleted, setDeleted]       = useState(getDeletedShoppingItems)
-  const [libraryOpen, setLibraryOpen] = useState(false)
+  const [items, setItems]             = useState(getShoppingList)
   const [translating, setTranslating] = useState(false)
   const [rareStores, setRareStores] = useState({}) // { [itemId]: { open, loading, stores, error } }
   const { profile } = useAuth()
@@ -63,10 +59,7 @@ export default function Shopping() {
   }
 
   useEffect(() => {
-    const onStorage = () => {
-      setItems(getShoppingList())
-      setDeleted(getDeletedShoppingItems())
-    }
+    const onStorage = () => setItems(getShoppingList())
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
   }, [])
@@ -131,21 +124,7 @@ export default function Shopping() {
 
   function toggle(id) { setItems(toggleShoppingItem(id)) }
   function toggleSelectAll() { setItems(setAllShoppingChecked(!allSelected)) }
-  function deleteSelected() {
-    // Marked items move to the deleted library (restorable) — not purged.
-    const { items: newItems, deleted: newDeleted } = moveCheckedToDeleted()
-    setItems(newItems); setDeleted(newDeleted)
-  }
-  function restore(id) {
-    const { items: newItems, deleted: newDeleted } = restoreDeletedItem(id)
-    setItems(newItems); setDeleted(newDeleted)
-  }
-  function purgeOne(id)   { setDeleted(permanentlyDeleteItem(id)) }
-  function purgeAll()     {
-    if (window.confirm('למחוק את כל הספרייה לצמיתות? פעולה זו לא ניתנת לשחזור.')) {
-      setDeleted(clearDeletedLibrary())
-    }
-  }
+  function deleteSelected() { setItems(deleteCheckedItems()) }
 
   function shareList() {
     const lines = []
@@ -168,7 +147,7 @@ export default function Shopping() {
       <AppHeader title="רשימת קניות" compact />
 
       <div className="page-scroll" style={{ padding: '0 16px 24px' }}>
-        {items.length === 0 && deleted.length === 0 && (
+        {items.length === 0 && (
           <div style={{ textAlign: 'center', padding: '80px 24px', color: 'var(--text-muted)' }}>
             <IconShoppingCart size={48} style={{ marginBottom: 16, opacity: .3 }} />
             <p>הרשימה ריקה</p>
@@ -215,65 +194,7 @@ export default function Shopping() {
             <IconTrash size={18} /> מחיקת פריטים מסומנים ({checked.length})
           </button>
         )}
-
-        {deleted.length > 0 && (
-          <button
-            onClick={() => setLibraryOpen(true)}
-            style={{
-              width: '100%', marginTop: 16, padding: '12px 16px',
-              background: 'transparent', color: 'var(--text-muted)',
-              border: '1px dashed var(--border-mid)', borderRadius: 12,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              fontSize: '.85rem', cursor: 'pointer',
-            }}
-          >
-            <IconArchive size={16} /> ספריית מחוקים ({deleted.length})
-          </button>
-        )}
       </div>
-
-      {libraryOpen && (
-        <div className="drawer-overlay" onClick={() => setLibraryOpen(false)}>
-          <div className="drawer" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
-            <div className="drawer-header">
-              <span className="drawer-title">ספריית מחוקים ({deleted.length})</span>
-              <button className="btn-icon" onClick={() => setLibraryOpen(false)}><IconX size={18} /></button>
-            </div>
-            <div className="drawer-body" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <p style={{ fontSize: '.8rem', color: 'var(--text-muted)', margin: '0 0 8px' }}>
-                פריטים שסיימתם לקנות. שחזרו כדי להחזיר לרשימה, או מחקו לצמיתות.
-              </p>
-              {deleted.map(item => (
-                <div key={item.id} className="shopping-deleted-row">
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="shopping-name" style={{ wordBreak: 'break-word' }}>
-                      {qtyPrefix(item)}<strong>{item.name}</strong>
-                    </div>
-                    {item.name_local && item.name_local !== item.name && (
-                      <div style={{ fontSize: '.7rem', color: 'var(--text-muted)' }}>{item.name_local}</div>
-                    )}
-                  </div>
-                  <button className="btn-icon" title="שחזרו" onClick={() => restore(item.id)} style={{ color: 'var(--green)' }}>
-                    <IconArrowBackUp size={16} />
-                  </button>
-                  <button className="btn-icon" title="מחקו לצמיתות" onClick={() => purgeOne(item.id)} style={{ color: 'var(--red)' }}>
-                    <IconTrash size={16} />
-                  </button>
-                </div>
-              ))}
-              {deleted.length > 0 && (
-                <button
-                  className="btn btn-ghost btn-sm"
-                  style={{ marginTop: 12, color: 'var(--red)', borderColor: 'var(--red)' }}
-                  onClick={purgeAll}
-                >
-                  מחיקת הספרייה לצמיתות
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       <BottomNav />
     </div>

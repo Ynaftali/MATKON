@@ -1,5 +1,4 @@
-const KEY         = 'matkon_shopping'
-const KEY_DELETED = 'matkon_shopping_deleted'
+const KEY = 'matkon_shopping'
 
 // Brief §247: items grouped by category for convenience while shopping.
 export const SHOPPING_CATEGORIES = {
@@ -170,10 +169,8 @@ function sameItem(a, name, unit) {
     && (a.unit || '').trim() === unit
 }
 
-function load()         { try { return JSON.parse(localStorage.getItem(KEY)         || '[]') } catch { return [] } }
-function loadDeleted()  { try { return JSON.parse(localStorage.getItem(KEY_DELETED) || '[]') } catch { return [] } }
-function save(items)    { localStorage.setItem(KEY,         JSON.stringify(items))  }
-function saveDeleted(d) { localStorage.setItem(KEY_DELETED, JSON.stringify(d))      }
+function load()      { try { return JSON.parse(localStorage.getItem(KEY) || '[]') } catch { return [] } }
+function save(items) { localStorage.setItem(KEY, JSON.stringify(items)) }
 
 function normalizeQty(q) {
   const n = parseFloat(String(q).replace(',', '.'))
@@ -181,36 +178,15 @@ function normalizeQty(q) {
 }
 
 export function getShoppingList() { return load() }
-export function getDeletedShoppingItems() { return loadDeleted() }
 
 export function addIngredientsToList(ingredients, recipeTitle) {
   const existing = load()
-  const deleted  = loadDeleted()
 
   for (const ing of ingredients) {
     const name = (ing.name_he || ing.name || '').trim()
     const unit = (ing.unit || '').trim()
     const qty  = normalizeQty(ing.quantity || ing.amount || 0)
     if (!name) continue
-
-    // Brief §249: "...אלא אם כן ישחזרו אותו, או יתווסף שוב ממתכון" — if the same
-    // item lives in the deleted library, restoring it (rather than creating a
-    // duplicate) is the expected behavior.
-    const deletedIdx = deleted.findIndex(d => sameItem(d, name, unit))
-    if (deletedIdx >= 0) {
-      const restored = deleted.splice(deletedIdx, 1)[0]
-      restored.checked = false
-      restored.qty     = +(restored.qty + qty).toFixed(2)
-      restored.recipes = [...new Set([...(restored.recipes || []), recipeTitle].filter(Boolean))]
-      // Force a fresh translation/category rather than carrying forward a
-      // possibly-stale value from before the item was deleted (e.g. from an
-      // older, buggy AI response) — every (re)add goes through the same
-      // enrichment check on the next Shopping page load.
-      restored.name_local = null
-      restored.category   = categorizeIngredient(name)
-      existing.push(restored)
-      continue
-    }
 
     // Smart merge: same name + same unit → sum quantities
     const match = existing.find(e => sameItem(e, name, unit) && !e.checked)
@@ -231,7 +207,6 @@ export function addIngredientsToList(ingredients, recipeTitle) {
     }
   }
   save(existing)
-  saveDeleted(deleted)
   return existing
 }
 
@@ -248,57 +223,11 @@ export function setAllShoppingChecked(checked) {
   return items
 }
 
-// Brief §249: checked items move to the deleted library — not purged.
-// They can be restored or kept forever; the active list stays clean.
-export function moveCheckedToDeleted() {
-  const items   = load()
-  const deleted = loadDeleted()
-  const keep    = []
-  for (const it of items) {
-    if (it.checked) deleted.unshift({ ...it, deleted_at: Date.now(), checked: false })
-    else keep.push(it)
-  }
-  save(keep)
-  saveDeleted(deleted)
-  return { items: keep, deleted }
-}
-
-export function restoreDeletedItem(id) {
-  const deleted   = loadDeleted()
-  const idx       = deleted.findIndex(d => d.id === id)
-  if (idx < 0) return { items: load(), deleted }
-  const [restored] = deleted.splice(idx, 1)
-  delete restored.deleted_at
-  restored.checked = false
-  const items = load()
-  items.push(restored)
+// Marked items are removed immediately and permanently — no restore step.
+export function deleteCheckedItems() {
+  const items = load().filter(i => !i.checked)
   save(items)
-  saveDeleted(deleted)
-  return { items, deleted }
-}
-
-export function permanentlyDeleteItem(id) {
-  const deleted = loadDeleted().filter(d => d.id !== id)
-  saveDeleted(deleted)
-  return deleted
-}
-
-export function clearDeletedLibrary() {
-  saveDeleted([])
-  return []
-}
-
-// Backwards-compat for old call sites — now an alias for moveCheckedToDeleted.
-export function removeChecked() { return moveCheckedToDeleted().items }
-
-// "ניקוי הרשימה" — move *everything* to deleted, so a careless tap is recoverable.
-export function clearAll() {
-  const items   = load()
-  const deleted = loadDeleted()
-  for (const it of items) deleted.unshift({ ...it, deleted_at: Date.now(), checked: false })
-  save([])
-  saveDeleted(deleted)
-  return []
+  return items
 }
 
 export function shoppingCount() {
