@@ -134,9 +134,11 @@ If you cannot find any real stores after searching, return an empty array: []`
         // past 3-4 minutes, long enough that mobile networks drop the
         // connection before the response arrives (confirmed in production
         // logs: the call succeeded server-side after the client had already
-        // errored out). 2 rounds trades a little result breadth for a much
-        // more reliable round trip.
-        tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 2 }],
+        // errored out). A manual comparison on the same ingredients (zaatar,
+        // raw tahini, ptitim, skhug — Auckland NZ) found that one well-scoped
+        // search already surfaces the same real stores a second round would,
+        // so the second round was mostly adding latency, not new results.
+        tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 1 }],
         messages: [{
           role: 'user',
           content: `Ingredient (may be written in Hebrew): ${ingredient}\nCountry: ${en}\nLocal language: ${lang}\n\nFirst identify what this ingredient actually is in a cooking context (not a literal word-for-word translation), and its correct culinary name in ${lang} or English. Then use web_search to find real stores (online, or with delivery) in ${en} where it can be purchased. Search using that correct culinary name — never a literal translation of the Hebrew text.`,
