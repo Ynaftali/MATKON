@@ -234,7 +234,7 @@ export default function Shopping() {
 
       {libraryOpen && (
         <div className="drawer-overlay" onClick={() => setLibraryOpen(false)}>
-          <div className="drawer" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+          <div className="drawer" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="drawer-header">
               <span className="drawer-title">ספריית מחוקים ({deleted.length})</span>
               <button className="btn-icon" onClick={() => setLibraryOpen(false)}><IconX size={18} /></button>
