@@ -59,7 +59,7 @@ export default async function handler(req, res) {
   const hebrewTarget = lang === 'Hebrew'
 
   const system = `You are a culinary assistant. The input is a list of Hebrew recipe ingredients for a shopper living in ${en}. For each ingredient return:
-- name_local: the ingredient's common name in ${lang} — the term a local shopper recognises on packaging in ${en}.${hebrewTarget ? '' : ` It MUST be written in ${lang} (Latin/local script), NEVER in Hebrew. If there is no local equivalent, transliterate the Hebrew into ${lang}.`} Use local usage, not American English (e.g. NZ/AU/UK: "coriander" not "cilantro", "icing sugar" not "powdered sugar").
+- name_local: the ingredient's common name in ${lang} — the term a local shopper recognises on packaging in ${en}.${hebrewTarget ? '' : ` It MUST be written in ${lang} (Latin/local script), NEVER in Hebrew. If there is no local equivalent, transliterate the Hebrew into ${lang}.`} Use local usage, not American English (e.g. NZ/AU/UK: "coriander" not "cilantro", "icing sugar" not "powdered sugar"). Translate what the ingredient literally IS — never substitute a different, thematically-related ingredient (e.g. two spices that happen to appear in the same cuisine or the same dish are still different ingredients; do not swap one for the other). If you are not fully confident of the exact local name, transliterate the Hebrew term phonetically into ${lang} instead of guessing a different real ingredient.
 - category: a shopping-aisle category for grouping.
 - where_to_buy: for items genuinely hard to find in an average ${en} supermarket, a 1-2 sentence hint (store type/area specific to ${en}); otherwise null.
 
@@ -71,7 +71,7 @@ Return ONLY a valid JSON array:
 
 Rules:
 - index matches the position in the input array.
-- category: ONE of dairy, produce_veg, produce_fruit, meat_fish, spices, pantry, bakery, frozen, other. Eggs → other (they are pareve: neither meat nor dairy). Salt/sugar/oil → pantry. Fresh herbs → produce_veg. Dried herbs → spices.
+- category: ONE of dairy, produce_veg, produce_fruit, meat_fish, spices, pantry, bakery, frozen, other. Eggs → other (they are pareve: neither meat nor dairy). Salt/sugar/oil → pantry. Herbs (fresh or dried) → spices, not produce_veg — a herb is a spice regardless of freshness.
 - where_to_buy: null if easily found in regular supermarkets. Non-null only for specialty/rare items (do NOT flag staples like flour, sugar, eggs, butter).`
 
   const ingredientList = ingredients.map((ing, i) => {
@@ -112,7 +112,23 @@ Rules:
     })
 
     const raw = data.content[0].text.trim().replace(/^```json?\n?/i, '').replace(/\n?```$/, '')
-    const result = JSON.parse(raw)
+    let result = JSON.parse(raw)
+    if (!Array.isArray(result)) result = []
+
+    // The client re-attaches each entry to its ingredient purely by the
+    // model-reported `index` (see Shopping.jsx / RecipePage.jsx) — nothing
+    // downstream re-validates it. Drop any entry whose index is out of range
+    // or duplicated so a malformed response degrades to "missing enrichment
+    // for that item" rather than silently attaching the wrong translation to
+    // the wrong ingredient.
+    const seen = new Set()
+    result = result.filter(e => {
+      if (typeof e?.index !== 'number' || e.index < 0 || e.index >= ingredients.length) return false
+      if (seen.has(e.index)) return false
+      seen.add(e.index)
+      return true
+    })
+
     return res.status(200).json({ enriched: result })
   } catch (err) {
     console.error('translate-ingredients error:', err)

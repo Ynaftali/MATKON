@@ -33,6 +33,12 @@ const KEYWORD_CATEGORY = [
   ['וניל',  'spices'], ['סודה לשתיה','spices'], ['אבקת אפיה','spices'],
   ['אבקת אפייה', 'spices'], ['שמרים',  'spices'], ['חרדל גרגרים','spices'],
   ['פרג',   'spices'], ['שומשום',    'spices'],
+  // Herbs are spices regardless of freshness — a fresh bunch of coriander is
+  // still a herb, not a vegetable. Must come before the vegetables block below
+  // (first match wins) and stay in sync with the AI category rule in
+  // api/translate-ingredients.js.
+  ['כוסבר',  'spices'], ['פטרוזיל', 'spices'], ['שמיר',    'spices'],
+  ['בזיליקום','spices'], ['נענע',   'spices'],
 
   // ── dairy ──
   ['חלב',    'dairy'], ['יוגורט',  'dairy'], ['גבינה',  'dairy'],
@@ -79,9 +85,8 @@ const KEYWORD_CATEGORY = [
   ['חציל',   'produce_veg'], ['דלעת',   'produce_veg'], ['דלורית', 'produce_veg'],
   ['תרד',    'produce_veg'], ['סלרי',   'produce_veg'], ['צנון',   'produce_veg'],
   ['לפת',    'produce_veg'], ['ארטישוק','produce_veg'], ['בטטה',   'produce_veg'],
-  ['פטריות', 'produce_veg'], ['במיה',   'produce_veg'], ['כוסבר',  'produce_veg'],
-  ['פטרוזיל','produce_veg'], ['שמיר',   'produce_veg'], ['בזיליקום','produce_veg'],
-  ['נענע',   'produce_veg'], ['רוקט',   'produce_veg'], ['בייבי',  'produce_veg'],
+  ['פטריות', 'produce_veg'], ['במיה',   'produce_veg'],
+  ['רוקט',   'produce_veg'], ['בייבי',  'produce_veg'],
   ['קייל',   'produce_veg'], ['חומוס גרגר','produce_veg'],
 
   // ── frozen ──
