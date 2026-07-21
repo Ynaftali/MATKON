@@ -7,10 +7,7 @@ export const config = { runtime: 'nodejs' }
 // User-triggered (click on the "rare ingredient" arrow), so the cap is
 // generous relative to a per-recipe automatic call, but still bounded.
 const RATE_LIMIT_PER_HOUR = 15
-const MODEL = 'claude-sonnet-5'
-const COST_PER_INPUT_TOKEN  = 0.000003
-const COST_PER_OUTPUT_TOKEN = 0.000015
-const COST_PER_SEARCH       = 0.01 // Anthropic web_search tool: $10 / 1,000 searches
+const MODEL = 'sonar-pro'
 
 function normalize(s) {
   return String(s || '').trim().toLowerCase().slice(0, 200)
@@ -101,87 +98,72 @@ export default async function handler(req, res) {
     return res.status(503).json({ error: 'unavailable', message: 'השירות אינו זמין כעת. נסו שוב מאוחר יותר.' })
   }
 
-  const system = `You are a shopping assistant helping someone find where to buy a specific food ingredient in their country of residence. Use the web_search tool to find real, currently existing stores — do not invent store names or URLs.
+  const system = `You are a shopping assistant helping someone find where to buy a specific food ingredient in their country of residence. Search the web to find real, currently existing stores — do not invent store names or URLs.
 
 Before searching, identify what the ingredient actually IS in a kitchen/cooking context — never translate the Hebrew word literally. Hebrew food words are often ambiguous out of context and a literal translation can name a completely different product (for example "פתיתים" is a small Israeli pasta shape, not "flakes" and not breadcrumbs; "קורנפלור" is cornstarch, not corn flour). Think about what dish or cuisine this ingredient belongs to, then search using the correct culinary name in the local language or English.
 
-After searching, respond with ONLY a JSON array (no markdown fences, no explanation) of up to 3 real stores where this ingredient can be bought, each with a working URL to that store or a specific product page:
+Respond with ONLY a JSON array (no markdown fences, no explanation) of up to 5 real stores where this ingredient can be bought, each with a working URL to that store or a specific product page:
 [{"name": "Store Name", "url": "https://..."}]
 
-If you cannot find any real stores after searching, return an empty array: []`
+Requesting 5 rather than 3 is deliberate — some of these get discarded by a link-liveness check downstream, so a wider candidate list is needed to still surface 2-3 verified results. If you cannot find any real stores after searching, return an empty array: []`
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
       headers: {
-        'Content-Type':      'application/json',
-        'x-api-key':         process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${process.env.PERPLEXITY_API_KEY}`,
       },
-      // A hard cap that fails fast and gracefully. Without this, a query the
-      // model struggles with (confirmed in production: "סחוג" ran until
-      // Vercel's own 300s function limit killed it, so the user waited 5
-      // minutes for nothing) has no upper bound of its own. 60s covers every
-      // normal case seen so far (25s-2min) with margin, while turning the
-      // worst case into a clear, fast failure instead of a long hang.
+      // A hard cap that fails fast and gracefully, mirroring the Anthropic
+      // implementation this replaced. Real calls have run 2-6s, so 60s is a
+      // wide safety margin, not the expected latency.
       signal: AbortSignal.timeout(60_000),
       body: JSON.stringify({
-        model:      MODEL,
-        max_tokens: 1024,
-        system,
-        thinking: { type: 'disabled' },
-        // Each search round adds tens of seconds; 3 rounds pushed real calls
-        // past 3-4 minutes, long enough that mobile networks drop the
-        // connection before the response arrives (confirmed in production
-        // logs: the call succeeded server-side after the client had already
-        // errored out). A manual comparison on the same ingredients (zaatar,
-        // raw tahini, ptitim, skhug — Auckland NZ) found that one well-scoped
-        // search already surfaces the same real stores a second round would,
-        // so the second round was mostly adding latency, not new results.
-        tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 1 }],
-        messages: [{
-          role: 'user',
-          content: `Ingredient (may be written in Hebrew): ${ingredient}\nCountry: ${en}\nLocal language: ${lang}\n\nFirst identify what this ingredient actually is in a cooking context (not a literal word-for-word translation), and its correct culinary name in ${lang} or English. Then use web_search to find real stores (online, or with delivery) in ${en} where it can be purchased. Search using that correct culinary name — never a literal translation of the Hebrew text.`,
-        }],
+        model: MODEL,
+        messages: [
+          { role: 'system', content: system },
+          {
+            role: 'user',
+            content: `Ingredient (may be written in Hebrew): ${ingredient}\nCountry: ${en}\nLocal language: ${lang}\n\nFirst identify what this ingredient actually is in a cooking context (not a literal word-for-word translation), and its correct culinary name in ${lang} or English. Then search the web to find real stores (online, or with delivery) in ${en} where it can be purchased. Search using that correct culinary name — never a literal translation of the Hebrew text.`,
+          },
+        ],
       }),
     })
 
     if (!response.ok) return res.status(500).json({ error: 'AI error' })
 
     const data = await response.json()
-    const inputTokens  = data.usage?.input_tokens  || 0
-    const outputTokens = data.usage?.output_tokens || 0
-    const searchCount  = data.content?.filter(b => b.type === 'web_search_tool_result').length || 0
-    const costUsd = (inputTokens * COST_PER_INPUT_TOKEN) + (outputTokens * COST_PER_OUTPUT_TOKEN) + (searchCount * COST_PER_SEARCH)
+    const costUsd = data.usage?.cost?.total_cost || 0
 
     adminInsert('usage_log', {
       user_id:       userId,
       endpoint:      'find-rare-ingredient',
       model:         MODEL,
-      input_tokens:  inputTokens,
-      output_tokens: outputTokens,
+      input_tokens:  data.usage?.prompt_tokens     || 0,
+      output_tokens: data.usage?.completion_tokens || 0,
       cost_usd:      costUsd,
     })
 
-    // The model frequently wraps the JSON in prose after a web search (e.g. "Based
-    // on my search, here are stores: [...]") and may split it across several text
-    // blocks — so parsing the whole concatenated blob throws and we'd drop real
-    // results. Extract the JSON array substring itself instead.
-    const textBlock = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n')
-    const match = textBlock.match(/\[[\s\S]*\]/)
+    // Despite Sonar being a search-grounded model, it still fabricates
+    // plausible-sounding store domains for niche/diaspora queries — measured
+    // directly: 7 of 12 URLs across 4 real test queries didn't resolve or
+    // 404'd. Extract the JSON array substring rather than trusting the whole
+    // response is clean JSON, same reasoning as the previous implementation.
+    const text = data.choices?.[0]?.message?.content || ''
+    const match = text.match(/\[[\s\S]*\]/)
 
     let stores = []
     if (match) { try { stores = JSON.parse(match[0]) } catch { stores = [] } }
     if (!Array.isArray(stores)) stores = []
     stores = stores
       .filter(s => s && typeof s.url === 'string' && /^https?:\/\//i.test(s.url) && typeof s.name === 'string')
-      .slice(0, 3)
+      .slice(0, 5)
       .map(s => ({ name: s.name.slice(0, 100), url: s.url.slice(0, 500) }))
 
     // Verify every link actually resolves before it reaches the user or the
     // shared cache — the model invents URLs despite being told not to.
     const aliveFlags = await Promise.all(stores.map(s => isLinkAlive(s.url)))
-    stores = stores.filter((_, i) => aliveFlags[i])
+    stores = stores.filter((_, i) => aliveFlags[i]).slice(0, 3)
 
     if (stores.length > 0) {
       // Awaited (unlike the usage_log write above) — losing this defeats the
