@@ -118,6 +118,13 @@ If you cannot find any real stores after searching, return an empty array: []`
         'x-api-key':         process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
       },
+      // A hard cap that fails fast and gracefully. Without this, a query the
+      // model struggles with (confirmed in production: "סחוג" ran until
+      // Vercel's own 300s function limit killed it, so the user waited 5
+      // minutes for nothing) has no upper bound of its own. 60s covers every
+      // normal case seen so far (25s-2min) with margin, while turning the
+      // worst case into a clear, fast failure instead of a long hang.
+      signal: AbortSignal.timeout(60_000),
       body: JSON.stringify({
         model:      MODEL,
         max_tokens: 1024,
