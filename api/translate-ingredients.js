@@ -96,6 +96,7 @@ Rules:
         model:      MODEL,
         max_tokens: 1024,
         system,
+        thinking: { type: 'disabled' },
         messages: [{ role: 'user', content: `Country: ${en}\nTarget language for name_local: ${lang}\n\nIngredients:\n${ingredientList}` }],
       }),
     })
@@ -116,7 +117,8 @@ Rules:
       cost_usd:      costUsd,
     })
 
-    const raw = data.content[0].text.trim().replace(/^```json?\n?/i, '').replace(/\n?```$/, '')
+    const textBlock = (data.content || []).find(b => b.type === 'text')
+    const raw = (textBlock?.text || '').trim().replace(/^```json?\n?/i, '').replace(/\n?```$/, '')
     let result = JSON.parse(raw)
     if (!Array.isArray(result)) result = []
 
