@@ -184,7 +184,10 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         model,
-        max_tokens: 2048,
+        // A recipe with a long ingredient list and several sub-components
+        // (e.g. dough + filling + serving) can exceed 2048 tokens of JSON
+        // output and get cut off mid-string, breaking JSON.parse below.
+        max_tokens: 4096,
         system:     systemPrompt,
         messages:   [{ role: 'user', content: userContent }],
       }),
