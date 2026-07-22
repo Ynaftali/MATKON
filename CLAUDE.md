@@ -92,10 +92,7 @@ curl -s -b cookies.txt -A "WhatsApp/2.23.20.0" "<הפריסה>$R" | grep 'og:tit
 curl -s -b cookies.txt -A "Mozilla/5.0 (iPhone...) Safari/604.1" "<הפריסה>$R" | grep 'id="root"'
 ```
 
-🟠 **מגבלה ידועה:** `api/share-preview.js` שורה 6 מקבעת `ORIGIN = 'https://www.matkon.co'`.
-לכן גם בפריסת בדיקה, `og:url` ו-`og:image` מצביעים לפרודקשן. המשמעות: אי אפשר לבדוק
-את מסלול התמונה מקצה לקצה בסביבת הבדיקה עד שהכתובת תיגזר מהבקשה עצמה. זה התיקון
-הראשון שצריך לעשות כשניגשים לבאג התצוגה המקדימה בוואטסאפ.
+`api/share-preview.js` גוזר את הכתובת (`og:url`/`og:image`) מהבקשה עצמה (`originFrom`), כך שגם בפריסת בדיקה התצוגה מצביעה לעצמה ולא לפרודקשן.
 
 ---
 
