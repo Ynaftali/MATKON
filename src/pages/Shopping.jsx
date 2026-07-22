@@ -131,9 +131,13 @@ export default function Shopping() {
     for (const group of groupByCategory(unchecked)) {
       lines.push(`*${group.icon} ${group.label}*`)
       for (const i of group.items) {
-        const q   = i.qty > 0 ? `${i.qty} ${i.unit} ` : ''
-        const loc = i.name_local && i.name_local !== i.name ? ` (${i.name_local})` : ''
-        lines.push(`• ${q}${i.name}${loc}`)
+        const q      = i.qty > 0 ? `${i.qty} ${i.unit} ` : ''
+        // name_shop is the AI-cleaned purchase name (e.g. "בצל" from "בצל קצוץ") —
+        // once it exists it's what belongs on a shopping list, not the raw
+        // ingredient-as-written-in-the-recipe text.
+        const shown = i.name_shop || i.name
+        const loc   = i.name_local && i.name_local !== shown ? ` (${i.name_local})` : ''
+        lines.push(`• ${q}${shown}${loc}`)
       }
       lines.push('')
     }
@@ -202,10 +206,14 @@ export default function Shopping() {
 }
 
 function ShoppingRow({ item, onToggle, rare, onToggleRare }) {
-  const qtyStr    = qtyPrefix(item)
-  const localName = item.name_local
-  const hasLocal  = localName && localName !== item.name
-  const isRare    = !!item.where_to_buy
+  const qtyStr     = qtyPrefix(item)
+  // name_shop is the AI-cleaned purchase name ("בצל" instead of "בצל קצוץ") —
+  // it's what should read on the list once translation has filled it in. Fall
+  // back to the raw as-typed name until then.
+  const shownName  = item.name_shop || item.name
+  const localName  = item.name_local
+  const hasLocal   = localName && localName !== shownName
+  const isRare     = !!item.where_to_buy
 
   return (
     <div>
@@ -219,7 +227,7 @@ function ShoppingRow({ item, onToggle, rare, onToggleRare }) {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="shopping-name" style={{ wordBreak: 'break-word' }}>
-            {qtyStr}<strong>{item.name}</strong>
+            {qtyStr}<strong>{shownName}</strong>
             {hasLocal && <span className="shopping-name-local"> | {localName}</span>}
           </div>
           {isRare && (

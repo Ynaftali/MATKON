@@ -64,18 +64,20 @@ export default async function handler(req, res) {
   const hebrewTarget = lang === 'Hebrew'
 
   const system = `You are a culinary assistant. The input is a list of Hebrew recipe ingredients for a shopper living in ${en}. For each ingredient return:
-- name_local: the ingredient's common name in ${lang} — the term a local shopper recognises on packaging in ${en}.${hebrewTarget ? '' : ` It MUST be written in ${lang} (Latin/local script), NEVER in Hebrew. If there is no local equivalent, transliterate the Hebrew into ${lang}.`} Use local usage, not American English (e.g. NZ/AU/UK: "coriander" not "cilantro", "icing sugar" not "powdered sugar"). Translate what the ingredient literally IS — never substitute a different, thematically-related ingredient (e.g. two spices that happen to appear in the same cuisine or the same dish are still different ingredients; do not swap one for the other). If you are not fully confident of the exact local name, transliterate the Hebrew term phonetically into ${lang} instead of guessing a different real ingredient.
+- name_shop: the ingredient's plain Hebrew SHOPPING name — what you would actually write on a shopping list. Remove preparation descriptors that describe how the cook processes the item at home, because you buy the whole item and prepare it yourself: chopped, sliced, diced, grated, minced, crushed by hand, peeled, halved, cubed, julienned, at room temperature, etc. ("בצל קצוץ" → "בצל", "3 שיני שום כתושות" → "שום", "גזר מגורר" → "גזר", "פלפל אדום קצוץ" → "פלפל אדום"). CRITICAL: keep every word that identifies a genuinely DIFFERENT product you buy off the shelf — a processed/canned/dried/ground form is its own product, NOT a preparation. Never merge two different products: "עגבניות מרוסקות" (canned) and "רסק עגבניות" (paste) each stay as they are and are NOT reduced to "עגבניות"; "אבקת שום" stays "אבקת שום" (not "שום"); "שקדים טחונים" (ground almonds, a product) stays as is; "חלב" and "חלבה" are unrelated. When unsure whether a word changes the product you buy, KEEP it. Always Hebrew, even for a shopper abroad.
+- name_local: the SHOPPING name (name_shop) rendered in ${lang} — the term a local shopper recognises on packaging in ${en}.${hebrewTarget ? '' : ` It MUST be written in ${lang} (Latin/local script), NEVER in Hebrew. If there is no local equivalent, transliterate the Hebrew into ${lang}.`} Use local usage, not American English (e.g. NZ/AU/UK: "coriander" not "cilantro", "icing sugar" not "powdered sugar"). Translate what the ingredient literally IS — never substitute a different, thematically-related ingredient (e.g. two spices that happen to appear in the same cuisine or the same dish are still different ingredients; do not swap one for the other). If you are not fully confident of the exact local name, transliterate the Hebrew term phonetically into ${lang} instead of guessing a different real ingredient.
 - category: a shopping-aisle category for grouping.
 - where_to_buy: for items genuinely hard to find in an average ${en} supermarket, a 1-2 sentence hint (store type/area specific to ${en}); otherwise null.
 
 Return ONLY a valid JSON array:
 [
-  { "index": 0, "name_local": "local name", "category": "produce_veg", "where_to_buy": null },
-  { "index": 1, "name_local": "local name", "category": "pantry",      "where_to_buy": "Asian supermarket or specialty food store" }
+  { "index": 0, "name_shop": "שם קנייה", "name_local": "local name", "category": "produce_veg", "where_to_buy": null },
+  { "index": 1, "name_shop": "שם קנייה", "name_local": "local name", "category": "pantry",      "where_to_buy": "Asian supermarket or specialty food store" }
 ]
 
 Rules:
 - index matches the position in the input array.
+- name_shop: always present, always Hebrew. Strip preparation words but preserve product-identifying words, as described above. When in doubt, keep the word.
 - category: ONE of dairy, produce_veg, produce_fruit, meat_fish, spices, pantry, bakery, frozen, other. Eggs → other (they are pareve: neither meat nor dairy). Salt/sugar/oil → pantry. Herbs (fresh or dried) → spices, not produce_veg — a herb is a spice regardless of freshness.
 - where_to_buy: null if easily found in regular supermarkets. Non-null only for specialty/rare items (do NOT flag staples like flour, sugar, eggs, butter).`
 

@@ -163,10 +163,38 @@ export function normalizeIngredientName(name) {
 }
 
 // Two entries are the same shopping line only if the ingredient AND the unit
-// agree — 2 קילו עגבניות and 3 עגבניות are genuinely different lines.
+// agree — 2 קילו עגבניות and 3 עגבניות are genuinely different lines. Once the AI
+// has assigned a name_shop (the plain purchase name), compare on that so a new
+// "בצל" merges into an already-normalized "בצל" line.
 function sameItem(a, name, unit) {
-  return normalizeIngredientName(a.name) === normalizeIngredientName(name)
+  return normalizeIngredientName(a.name_shop || a.name) === normalizeIngredientName(name)
     && (a.unit || '').trim() === unit
+}
+
+// After the AI assigns name_shop, two lines that were added separately
+// ("בצל קצוץ" from one recipe, "בצל" from another) can resolve to the same
+// purchase. Add-time can't know this — there is no AI call there — so we collapse
+// duplicates here, once, after enrichment. Only unchecked items merge; checked
+// items (already handled/bought) are left exactly as they are.
+function mergeDuplicates(items) {
+  const out = []
+  const indexByKey = new Map()
+  for (const it of items) {
+    if (it.checked) { out.push(it); continue }
+    const key = `${normalizeIngredientName(it.name_shop || it.name)} ${(it.unit || '').trim()}`
+    const at = indexByKey.get(key)
+    if (at === undefined) {
+      indexByKey.set(key, out.length)
+      out.push({ ...it })
+    } else {
+      const target = out[at]
+      target.qty = +(((target.qty || 0) + (it.qty || 0)).toFixed(2))
+      target.recipes = [...new Set([...(target.recipes || []), ...(it.recipes || [])].filter(Boolean))]
+      // Keep the survivor's enrichment; only borrow a where_to_buy hint it lacks.
+      if (!target.where_to_buy && it.where_to_buy) target.where_to_buy = it.where_to_buy
+    }
+  }
+  return out
 }
 
 function load()      { try { return JSON.parse(localStorage.getItem(KEY) || '[]') } catch { return [] } }
@@ -234,15 +262,17 @@ export function shoppingCount() {
   return load().filter(i => !i.checked).length
 }
 
-// Apply a fresh AI translation/categorization result to the stored items in place.
+// Apply a fresh AI translation/categorization result to the stored items, then
+// collapse any duplicates the new name_shop reveals (see mergeDuplicates).
 export function updateItemsEnrichment(enrichedById) {
   const items = load().map(i => {
     const e = enrichedById[i.id]
     if (!e) return i
     return { ...i, ...e, category: e.category || i.category }
   })
-  save(items)
-  return items
+  const merged = mergeDuplicates(items)
+  save(merged)
+  return merged
 }
 
 export function groupByCategory(items) {

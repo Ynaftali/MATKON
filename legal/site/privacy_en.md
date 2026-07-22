@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated: July 20, 2026**
+**Last updated: July 22, 2026**
 
 > This English version is the binding version. A Hebrew translation is provided for the convenience of Hebrew-speaking users. In the event of any inconsistency, the English version prevails, subject to any mandatory consumer-protection rights in your country of residence.
 
@@ -58,14 +58,13 @@ If we wish to use information for a new purpose that is incompatible with these 
 
 We use service providers (data processors) to operate the Service. They may process the information only on our behalf and in accordance with the purposes in this policy. We do not sell your information and we do not share it with advertisers.
 
-| Provider | Role | What is transferred to it | Location |
+| Type of provider | Role | What is transferred to it | Location |
 |---|---|---|---|
-| **Supabase** | Database, authentication and storage | Account, content, images, acceptance logs | Japan |
-| **Anthropic (Claude)** | AI content processing and moderation | Recipe and ingredient text, and images for moderation review | United States |
-| **Pollinations** | Recipe image generation | A textual description (prompt) of the recipe | Germany (based in Berlin); infrastructure distributed across international cloud providers |
-| **Vercel** | Hosting and running the Service | Technical access data and logs (including IP) | United States (default function region); content network is global |
-| **Google / Apple** | Third-party sign-in (SSO) | Basic account information, if you chose this option | United States |
-| **Supadata** | Extracting a recipe from a video link (TikTok/Instagram/YouTube) | The video link you provided | Germany (Dumpling Software UG, Berlin) |
+| Database, authentication and storage provider | Storing your account, content and images, and operating the Service | Account, content, images, acceptance logs | Japan |
+| Artificial intelligence providers | Processing and organizing recipes, translating ingredients, searching for stores for a rare ingredient, generating recipe images, and content moderation | Recipe and ingredient text and images for review; for rare-ingredient search, the ingredient name and country only (not your identity) | United States, Germany |
+| Hosting and runtime provider | Hosting and running the Service | Technical access data and logs (including IP) | United States (default region); content network is global |
+| Third-party sign-in (SSO) provider, Google / Apple | Signing in with an external account, if you chose to | Basic account information | United States |
+| Video recipe extraction provider | Importing a recipe from a video link (TikTok/Instagram/YouTube) | The video link you provided | Germany |
 
 These providers are subject to their own privacy policies. We select providers committed to data protection and, where necessary, enter into appropriate processing agreements with them. In addition, we may disclose information if required to do so by law, court order, or to protect rights, safety and security.
 
