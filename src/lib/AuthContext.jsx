@@ -22,7 +22,11 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
-    // Get initial session from localStorage (instant, no network)
+    // Ask the browser not to evict our storage. On iOS this is what lets a
+    // home-screen (standalone) PWA hold onto the login across launches.
+    navigator.storage?.persist?.().catch(() => {})
+
+    // Get initial session from the auth cookie (instant, no network)
     supabase.auth.getSession().then(({ data: { session } }) => {
       const u = session?.user ?? null
       setUser(u)
