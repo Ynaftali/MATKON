@@ -3,7 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import {
   IconChevronRight, IconShare, IconClock, IconUsers, IconStar,
   IconMessageCircle, IconShoppingCart, IconExternalLink,
-  IconHeart, IconBookmark, IconSend, IconCheck, IconCamera, IconPencil, IconLock
+  IconHeart, IconBookmark, IconSend, IconCamera, IconPencil, IconLock
 } from '@tabler/icons-react'
 import { mockRecipes, CATEGORY_GRADIENTS, countryFlag } from '../lib/mock'
 import { supabase } from '../lib/supabase'
@@ -64,16 +64,12 @@ export default function RecipePage() {
   const [saveLoading, setSaveLoading] = useState(false)
   const [toast, setToast]           = useState('')
   const [imageRejected, setImageRejected] = useState(false)
-  const [shoppingOpen, setShoppingOpen]   = useState(false)
-  const [shoppingDone, setShoppingDone]   = useState({})
-  const [shoppingEnriched, setShoppingEnriched] = useState(null)
-  const [shoppingLoading, setShoppingLoading]   = useState(false)
   const imgEditRef = useRef()
   const [comments, setComments]     = useState([])
   const [newComment, setNewComment] = useState('')
   const [sending, setSending]       = useState(false)
   const [, setTick]                 = useState(0)  // forces timeAgo to refresh while page is open
-  const { user: currentUser, profile } = useAuth()
+  const { user: currentUser } = useAuth()
   // Guest (arrived via a shared link, no account): can view the recipe but every
   // action is gated behind a "register first" popup. See ux_ui מסך 9.
   const isGuest = !currentUser
@@ -281,32 +277,6 @@ export default function RecipePage() {
     }
   }
 
-  async function openShopping() {
-    setShoppingDone({})
-    setShoppingEnriched(null)
-    setShoppingOpen(true)
-    // Translate ingredients to user's local language
-    const country = profile?.country || currentUser?.user_metadata?.country
-    if (country && recipe?.ingredients?.length) {
-      setShoppingLoading(true)
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        const res = await fetch('/api/translate-ingredients', {
-          method: 'POST',
-          headers: {
-            'Content-Type':  'application/json',
-            'Authorization': `Bearer ${session?.access_token || ''}`,
-          },
-          body: JSON.stringify({ ingredients: recipe.ingredients, country }),
-        })
-        if (res.ok) {
-          const { enriched } = await res.json()
-          setShoppingEnriched(enriched)
-        }
-      } catch { /* translation unavailable — list still opens with the raw ingredients */ }
-      setShoppingLoading(false)
-    }
-  }
 
   async function handleImageReplace(e) {
     const file = e.target.files[0]
@@ -585,7 +555,7 @@ export default function RecipePage() {
         <button className={`btn btn-glossy btn-glossy-yellow${isGuest ? ' gated' : ''}`} onClick={() => {
           if (isGuest) { setGateOpen(true); return }
           addIngredientsToList(recipe.ingredients || [], recipe.title)
-          openShopping()
+          showToast('נוסף לרשימת הקניות ✓')
         }}>
           <IconShoppingCart size={18} /> הוסיפו לרשימת הקניות
         </button>
@@ -675,52 +645,6 @@ export default function RecipePage() {
       )}
 
       <ImageRejectionModal open={imageRejected} onClose={() => setImageRejected(false)} />
-
-      {/* Shopping list drawer */}
-      {shoppingOpen && (
-        <div className="drawer-overlay" onClick={() => setShoppingOpen(false)}>
-          <div className="drawer" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh' }}>
-            <div className="drawer-header">
-              <span className="drawer-title">רשימת קניות — {recipe.title}</span>
-              <button className="btn-icon" onClick={() => setShoppingOpen(false)}>✕</button>
-            </div>
-            <div className="drawer-body">
-              {shoppingLoading && (
-                <p style={{ textAlign:'center', color:'var(--text-muted)', padding:'12px 0', fontSize:'.85rem' }}>
-                  מתרגם לשפת המקום...
-                </p>
-              )}
-              {recipe.ingredients?.map((ing, idx) => {
-                const name      = ing.name_he || ing.name || ''
-                const qty       = ing.quantity || ing.amount || ''
-                const unit      = ing.unit || ''
-                const key       = `${idx}`
-                const enriched  = shoppingEnriched?.find(e => e.index === idx)
-                const localName = enriched?.name_local
-                const whereBuy  = enriched?.where_to_buy
-                return (
-                  <label key={key} className={`shopping-item ${shoppingDone[key] ? 'checked' : ''}`}>
-                    <input type="checkbox" checked={!!shoppingDone[key]} onChange={() => setShoppingDone(d => ({ ...d, [key]: !d[key] }))} style={{ display:'none' }} />
-                    <div className="shopping-check">{shoppingDone[key] ? <IconCheck size={14} /> : ''}</div>
-                    <div style={{ flex:1 }}>
-                      <div className="shopping-name">
-                        <span>{qty} {unit} </span>
-                        <span>{name}</span>
-                        {localName && localName !== name && (
-                          <span className="shopping-name-local"> | {localName}</span>
-                        )}
-                      </div>
-                      {whereBuy && (
-                        <div style={{ fontSize:'.75rem', color:'var(--blue-light)', marginTop:3 }}>📍 {whereBuy}</div>
-                      )}
-                    </div>
-                  </label>
-                )
-              })}
-            </div>
-          </div>
-        </div>
-      )}
 
       <BottomNav locked={isGuest} onLocked={() => setGateOpen(true)} />
     </div>
