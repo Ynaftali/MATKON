@@ -7,7 +7,6 @@ import { passwordValid } from '../lib/passwordRules'
 import { useAuth } from '../lib/useAuth'
 import BottomNav from '../components/BottomNav'
 import AppHeader from '../components/AppHeader'
-import RecipeCard from '../components/RecipeCard'
 import PasskeySection from '../components/PasskeySection'
 import NameFields from '../components/NameFields'
 import CountrySelect from '../components/CountrySelect'
@@ -16,11 +15,7 @@ import PasswordInput from '../components/PasswordInput'
 export default function Profile() {
   const navigate = useNavigate()
   const { user, profile, loading: authLoading, refreshProfile } = useAuth()
-  const [tab, setTab]             = useState('mine')
   const [recipes, setRecipes]     = useState([])
-  const [recipesLoading, setRecipesLoading] = useState(false)
-  const [saved, setSaved]         = useState([])
-  const [savedLoading, setSavedLoading] = useState(false)
   const [editOpen, setEditOpen]   = useState(false)
   const [editForm, setEditForm]   = useState({ firstName: '', lastName: '', country: '', bio: '' })
   const [savingProfile, setSavingProfile] = useState(false)
@@ -54,39 +49,20 @@ export default function Profile() {
     setSavedCount(sc || 0)
   }
 
+  // Only the counts feed the stats bar now (the recipe lists moved to the
+  // Recipes page), so fetch just id + is_public.
   async function loadRecipes(userId) {
-    setRecipesLoading(true)
     const { data } = await supabase
       .from('recipes')
-      .select('*')
+      .select('id, is_public')
       .eq('user_id', userId)
-      .order('created_at', { ascending: false })
     setRecipes(data || [])
-    setRecipesLoading(false)
-  }
-
-  // Recipes the user bookmarked (Recipes.jsx loadSaved pattern): saved → recipe_ids → recipes.
-  async function loadSaved(userId) {
-    setSavedLoading(true)
-    const { data: savedRows } = await supabase
-      .from('saved')
-      .select('recipe_id')
-      .eq('user_id', userId)
-    const ids = (savedRows || []).map(s => s.recipe_id)
-    if (!ids.length) { setSaved([]); setSavedLoading(false); return }
-    const { data } = await supabase
-      .from('recipes')
-      .select('*')
-      .in('id', ids)
-      .order('created_at', { ascending: false })
-    setSaved(data || [])
-    setSavedLoading(false)
   }
 
   useEffect(() => {
     if (!authLoading && !user) { navigate('/login'); return }
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- kicks off the three per-tab fetches once the logged-in user resolves; each sets its own state once its data arrives
-    if (user) { loadRecipes(user.id); loadSaved(user.id); loadCounts(user.id) }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads the recipe/like/saved counts for the stats bar once the logged-in user resolves
+    if (user) { loadRecipes(user.id); loadCounts(user.id) }
   }, [user, authLoading, navigate])
 
   useEffect(() => {
@@ -280,7 +256,11 @@ export default function Profile() {
 
   const activeProfile = profile
   const fullName  = activeProfile?.full_name || 'משתמש'
-  const firstName = fullName.split(' ')[0] || 'משתמש'
+  // Same split as openEdit: first token = first name, the rest = last name
+  // (registration stores the two fields joined as "first last").
+  const nameSpace = fullName.trim().indexOf(' ')
+  const firstName = nameSpace === -1 ? fullName.trim() : fullName.trim().slice(0, nameSpace)
+  const lastName  = nameSpace === -1 ? '' : fullName.trim().slice(nameSpace + 1)
   const country   = activeProfile?.country  || ''
   const flag      = countryFlag(country)
   const currentEmail = user?.email || ''
@@ -301,9 +281,6 @@ export default function Profile() {
           </span>
           <span className="profile-name">{firstName}</span>
         </div>
-        {activeProfile?.bio && (
-          <div className="profile-bio">{activeProfile.bio}</div>
-        )}
         <button
           className="btn btn-glossy btn-glossy-blue btn-sm"
           style={{ width:'auto', marginTop:8, display:'inline-flex', alignItems:'center', gap:6 }}
@@ -327,44 +304,30 @@ export default function Profile() {
         </div>
       </div>
 
-      <div className="profile-tabs">
-        <div className={`profile-tab ${tab==='mine'?'active':''}`}  onClick={() => setTab('mine')}>המתכונים שלי</div>
-        <div className={`profile-tab ${tab==='saved'?'active':''}`} onClick={() => setTab('saved')}>שמורים</div>
-      </div>
-
-      <div style={{ padding:'0 16px' }}>
-        {tab === 'mine' && recipesLoading && (
-          <p style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>טוענים...</p>
-        )}
-
-        {tab === 'mine' && !recipesLoading && recipes.length === 0 && (
-          <div style={{ textAlign:'center', padding:'60px 24px', color:'var(--text-muted)' }}>
-            <div style={{ fontSize:'2.5rem', marginBottom:12 }}>🍳</div>
-            <p>עדיין אין מתכונים</p>
-            <button className="btn btn-primary" style={{ marginTop:16, maxWidth:200 }} onClick={() => navigate('/add')}>
-              הוספת מתכון
-            </button>
-          </div>
-        )}
-
-        {tab === 'mine' && recipes.map(r => (
-          <RecipeCard key={r.id} recipe={r} visibility onClick={() => navigate(`/recipe/${r.id}`)} />
-        ))}
-
-        {tab === 'saved' && savedLoading && (
-          <p style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>טוענים...</p>
-        )}
-
-        {tab === 'saved' && !savedLoading && saved.length === 0 && (
-          <div style={{ textAlign:'center', padding:'60px 24px', color:'var(--text-muted)' }}>
-            <div style={{ fontSize:'2.5rem', marginBottom:12 }}>🔖</div>
-            <p>עדיין אין מתכונים שמורים</p>
-          </div>
-        )}
-
-        {tab === 'saved' && saved.map(r => (
-          <RecipeCard key={r.id} recipe={r} onClick={() => navigate(`/recipe/${r.id}`)} />
-        ))}
+      <div className="profile-details">
+        <div className="pd-row">
+          <span className="pd-label">שם פרטי</span>
+          <span className="pd-value">{firstName}</span>
+        </div>
+        <div className="pd-row">
+          <span className="pd-label">שם משפחה</span>
+          <span className="pd-value">{lastName || '—'}</span>
+        </div>
+        <div className="pd-row">
+          <span className="pd-label">מדינת מגורים</span>
+          <span className="pd-value">
+            {country || '—'}
+            {flag && flag !== '🇮🇱' && <span dir="ltr"> {flag}</span>}
+          </span>
+        </div>
+        <div className="pd-row">
+          <span className="pd-label">משפט קצר עליי</span>
+          <span className="pd-value">{activeProfile?.bio || '—'}</span>
+        </div>
+        <div className="pd-row">
+          <span className="pd-label">Email</span>
+          <span className="pd-value" dir="ltr">{currentEmail}</span>
+        </div>
       </div>
 
       {editOpen && (

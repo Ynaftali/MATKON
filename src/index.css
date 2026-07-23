@@ -962,12 +962,14 @@ p  { line-height: 1.6; }
 .profile-stat-lbl { font-size: .8rem; font-weight: 700; color: var(--text); }
 .profile-stat + .profile-stat { border-right: 1px solid var(--border); }
 
-.profile-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
-.profile-tab {
-  flex: 1; padding: 14px; text-align: center; font-weight: 600; font-size: .9rem;
-  color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all .2s;
+.profile-details { padding: 8px 16px 4px; display: flex; flex-direction: column; }
+.pd-row {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 13px 2px; border-bottom: 1px solid var(--border);
 }
-.profile-tab.active { color: var(--text); border-bottom-color: var(--blue); }
+.pd-row:last-child { border-bottom: none; }
+.pd-label { font-size: .78rem; font-weight: 700; color: var(--text-muted); }
+.pd-value { font-size: 1rem; color: var(--text); line-height: 1.5; overflow-wrap: break-word; }
 
 .profile-recipe-item {
   display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); cursor: pointer;
