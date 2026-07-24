@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Navigate } from 'react-router-dom'
 import { IconEye, IconEyeOff } from '@tabler/icons-react'
 import { supabase, canUsePasskeys, isPasskeyCancel } from '../lib/supabase'
 import { armConditionalPasskey } from '../lib/passkeys'
@@ -7,11 +7,13 @@ import SsoButtons from '../components/SsoButtons'
 import PasskeyOfferModal from '../components/PasskeyOfferModal'
 import AppHeader from '../components/AppHeader'
 import { takeReturnTo } from '../lib/returnTo'
+import { useAuth } from '../lib/useAuth'
 
 const PASSKEY_OFFER_SEEN = 'matkon_passkey_offer_seen'
 
 export default function Login() {
   const navigate = useNavigate()
+  const { user, loading: authLoading } = useAuth()
   const [form, setForm]   = useState({ email: '', password: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -96,6 +98,10 @@ export default function Login() {
     setOffer(false)
     navigate(takeReturnTo())
   }
+
+  // Already signed in (e.g. reached /login manually with a live session) —
+  // skip the form and go into the app, so the PWA never re-asks for a password.
+  if (!authLoading && user) return <Navigate to="/feed" replace />
 
   return (
     <div className="auth-page">
